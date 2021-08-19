@@ -28,7 +28,7 @@ get a grasp of neural networks in general and the constructs used for
 	<img	src="images/init_nn.png"
 			alt="Initiallization"
 			height="300" 
-			align="center"/>
+			style="horizontal-align:center"/>
 2. Training until trigger conditions are met
 	The neural network optimizes the classification results until one of the 
 	following options happen:
@@ -44,7 +44,7 @@ get a grasp of neural networks in general and the constructs used for
 	<img 	src="images/eval_nn.png"
 			alt="Evaluation"
 			height="300"
-			align="center"/>
+			style="horizontal-align:center"/>
 
 ## Release Information
 **0.0.1 - Initial Release**
