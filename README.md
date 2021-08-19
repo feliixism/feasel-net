@@ -52,10 +52,10 @@ include convolutional layers.
 
 [x] accuarcy and loss based evaluation
 
-[] ConvLayer support
+[ ] ConvLayer support
 
-[] intermediate layers shall be supported
+[ ] intermediate layers shall be supported
 
-[] paper on algorithm
+[ ] paper on algorithm
 
 
