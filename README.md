@@ -26,3 +26,10 @@ called ```LinearPass```.
 ## Release Information
 Until now, only dense layered architectures are supported. The plan is to also
 include convolutional layers.
+
+0.0.1 - Initial Release
+- callback FeatureSelection
+	- trigger parameters: delta epochs, thresholds, ...
+	- different metrics for triggering
+	- etc.
+- layer LinearPass
