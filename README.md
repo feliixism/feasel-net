@@ -47,10 +47,15 @@ get a grasp of neural networks in general and the constructs used for
 # ToDos
 Until now, only dense layered architectures are supported. The plan is to also
 include convolutional layers.
+
 [x] DenseLayer support
+
 [x] accuarcy and loss based evaluation
+
 [] ConvLayer support
+
 [] intermediate layers shall be supported
+
 [] paper on algorithm
 
 
