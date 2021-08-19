@@ -24,7 +24,9 @@ get a grasp of neural networks in general and the constructs used for
 	problem initiallized with the inputs and a binary mask for those inputs 
 	with only ones as its entries. This behaviour is induced by using a newly 
 	created layer type called ```LinearPass```.
-	![Initiallization](images/init_nn.png)
+	<img	src="images/init_nn.png"
+			alt="Initiallization"
+			style="height: 200, width: 600" />
 2. Training until trigger conditions are met
 	The neural network optimizes the classification results until one of the 
 	following options happen:
@@ -36,7 +38,9 @@ get a grasp of neural networks in general and the constructs used for
 	eliminating uninformative features.
 3. Importance estimation
 	As soon as the callback is triggered, the evaluation of the 
-	![Evaluation](images/eval_nn.png)
+	<img	src="images/eval_nn.png"
+			alt="Evaluation"
+			style="height: 200, width: 600" />
 
 ## Release Information
 **0.0.1 - Initial Release**
