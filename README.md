@@ -26,7 +26,7 @@ get a grasp of neural networks in general and the constructs used for
 	created layer type called ```LinearPass```.
 	<img	src="images/init_nn.png"
 			alt="Initiallization"
-			style="height: 200, width: 600" />
+			style="height: 100, width: 300" />
 2. Training until trigger conditions are met
 	The neural network optimizes the classification results until one of the 
 	following options happen:
@@ -40,7 +40,7 @@ get a grasp of neural networks in general and the constructs used for
 	As soon as the callback is triggered, the evaluation of the 
 	<img	src="images/eval_nn.png"
 			alt="Evaluation"
-			style="height: 200, width: 600" />
+			style="height: 100, width: 300" />
 
 ## Release Information
 **0.0.1 - Initial Release**
