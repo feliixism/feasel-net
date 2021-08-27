@@ -4,4 +4,6 @@ from . import constraints
 from . import layers
 from . import log
 from . import losses
+from . import metrics
 from . import plot
+from . import utils

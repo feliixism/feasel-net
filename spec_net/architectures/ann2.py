@@ -159,18 +159,18 @@ class ANN(Base):
 
 class FSANN(ANN):
     def __init__(self, X, y, n_features = None, callback = None, 
-                 layer = "Linear", **kwargs):
+                 layer_name = "Linear", **kwargs):
         super().__init__(X, y, **kwargs)
         if n_features is None:
             n_features = int(self._n_features / 10)
         self.n_features = n_features
         self.callback = callback
-        self.layer = layer
+        self.layer_name = layer_name
     
     def get_architecture(self):
         self.input_layer = x = Input(shape = (self._n_features, ), 
                                      name = "Input")
-        x = LinearPass(name = "Linear", trainable=True, kernel_regularizer="l1")(x)
+        x = LinearPass(name = "Linear")(x)
         x = self.get_block(x, n_nodes = None, n_layers = self.n_layers, 
                            architecture_type = self._building_params["architecture_type"])
         self.output_layer = Dense(self.data.n_classes, activation = "softmax", 
@@ -179,10 +179,10 @@ class FSANN(ANN):
     def fit_model(self, **kwargs):
         
         if self.callback is None:
-            self.callback = self.set_callback(layer = self.layer, 
+            self.callback = self.set_callback(layer_name = self.layer_name, 
                                               n_features = self.n_features)
         else:
-            self.callback = self.set_callback(layer = self.layer, 
+            self.callback = self.set_callback(layer_name = self.layer_name, 
                                               n_features = self.n_features,
                                               callback = self.callback)
         
@@ -199,16 +199,16 @@ class FSANN(ANN):
         
         return history
     
-    def set_callback(self, layer = "Linear", n_features = None, **kwargs):
+    def set_callback(self, layer_name = "Linear", n_features = None, **kwargs):
         
-        if layer is None:
+        if layer_name is None:
             return
         
         else:
-            print("Feature Selection Callback is instantiated.",
-                  f"The algorithm tries to find the {self.n_features}",
-                  "most important features.")
-            self.callback = [callbacks.FeatureSelection(layer = layer, 
+            print("Feature Selection Callback is instantiated.\n"
+                  f"The algorithm tries to find the {self.n_features} "
+                  "most important features.\n")
+            self.callback = [callbacks.FeatureSelection(layer_name = layer_name, 
                                                         n_features = n_features,
                                                         **kwargs)]
         

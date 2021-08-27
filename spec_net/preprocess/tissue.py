@@ -4,7 +4,7 @@ from spec_net.preprocess.spectrum import Spectrum
 from spec_net.preprocess.datahandling import CSVFile
 import matplotlib.pyplot as plt
 
-csv = CSVFile("realistic")
+# csv = CSVFile("realistic")
 
 class Proteins:
     def __init__(self, protein_config):
