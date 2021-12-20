@@ -38,3 +38,25 @@ def del_internal_kwargs(kwargs):
         if c == 0:
             break
     return kwargs
+
+def add_params(d, c):
+    """
+    Adds class variables to an existing dictionary.
+
+    Parameters
+    ----------
+    d : dict
+        The dictionary of the original parameters.
+    c : class
+        The class with its class variables that is added to the dictionary.
+
+    Returns
+    -------
+    d : TYPE
+        DESCRIPTION.
+
+    """
+    keys, values = c.__dict__.keys(), list(c.__dict__.values())
+    for i, key in enumerate(keys):
+        d[f"{key}"] = values[i]
+    return d

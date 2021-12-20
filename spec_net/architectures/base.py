@@ -1,8 +1,10 @@
 import numpy as np
-import keras
-from keras.models import Model
-from spec_net.data import classification
-from spec_net.tfcustom import plot
+from tensorflow import keras
+from tensorflow.keras.models import Model
+from ..preprocess.classification import DataContainer
+from ..plot import DNN
+from ..tfcustom.utils._params import Params
+from ..utils.time import get_timestamp
 
 import os
 
@@ -16,41 +18,48 @@ class Model(Model):
             self.layer_names.append(layer.name)
 
 class Base:
-    def __init__(self, X, y = None, **kwargs):
+    def __init__(self,
+                 X, y = None, 
+                 features = None,
+                 name = None,
+                 **kwargs):
         self.X = X
         self.y = y
+        if features is not None:
+            self.features = np.array(features)
+        else:
+            self.features = features
+        
+        self.name = name
                 
-        #training parameter container
-        self._training_params = {"epochs": 100,
-                                 "batch_size": 32,
-                                 "validation_split": 0.2,
-                                 "dropout_rate": 0.5,
-                                 "learning_rate": 1e-4,
-                                 "loss": "sparse_categorical_crossentropy",
-                                 "metric": "accuracy",
-                                 "test_split": 0.2,
-                                 "normalization": None,
-                                 "sample_axis": None,
-                                 "input_layer_type": "Dense",
-                                 "activation_function": "relu"}
+        # parameter container with train, build and data parameters
+        self.params = Params()
         
         for key in kwargs:
-            if key in self._training_params:
-                self._training_params[f"{key}"] = kwargs[f"{key}"]
+            if key in self.params.train.__dict__.keys():
+                self.params.train.update(key)(kwargs[key])
+            elif key in self.params.build.__dict__.keys():
+                self.params.build.update(key)(kwargs[key])
+            elif key in self.params.data.__dict__.keys():
+                self.params.data.update(key)(kwargs[key])
+            else:
+                raise KeyError(f"'{key}' is not a valid key for the generic "
+                               "neural network useage.")
         
         #data container
-        self._data = classification.Classification(X, y,
-                                                   sample_axis = self._training_params["sample_axis"],
-                                                   normalization = self._training_params["normalization"],
-                                                   input_layer_type = self._training_params["input_layer_type"])
+        self._data = DataContainer(X, y, 
+                                   features,
+                                   sample_axis=self.params.data.sample_axis,
+                                   normalization=self.params.data.normalization,
+                                   input_layer=self.params.data.input_layer)
         
-        self._params = {"data": self.data._data_params,
-                        "training": self._training_params}
-        
-        self._plot = plot.Base(self)
+        self.time = get_timestamp()
         
     def __repr__(self):
-        return f"{self.__class__.__name__}(Size of Dataset: {self._data.X.shape}, Number of Samples: {self._data.n_samples}, Number of Classes: {self._data.n_classes})"
+        return (f"{self.__class__.__name__}"
+                f"(Size of Dataset: {self._data.X.shape}, "
+                f"Number of Samples: {self._data.n_samples}, "
+                f"Number of Classes: {self._data.n_classes})")
         
     @property
     def data(self):
@@ -61,20 +70,43 @@ class Base:
         return self._plot
    
     def get_params(self, type = None):
+        """
+        Overview of all possible parameters for the instantiation of the 'Base'
+        class. 
+
+        Parameters
+        ----------
+        type : str, optional
+            Specifies the parameter group that is inspected. 'Build', 'data' 
+            and 'train' are the possible options. If None, all parameter 
+            groups are shown. The default is None.
+
+        Raises
+        ------
+        NameError
+            If the specified 'type' is not one of the aforementioned groups.
+
+        Returns
+        -------
+        params : dict
+            A dictionary of valid parameters.
+
+        """
         if type is None:
-            return self._params
+            return self.params
         else:
             try:
-                return self._params[f"{type}"]
+                return self.params[f"{type}"]
             except:
-                raise NameError(f"'{type}' is an invalid argument for 'type'.")
+                raise NameError(f"'{type}' is an invalid argument for 'type'." 
+                                " Try 'train', 'build' or 'data' instead.")
         
     def _get_layer_names(self):
         self.layer_names = []
         for layer in self.model.layers:
             self.layer_names.append(layer.name)    
   
-    # setters of training parameters
+    # setters
     def set_epochs(self, epochs):
         """
         Sets number of epochs.
@@ -89,7 +121,7 @@ class Base:
         None.
 
         """
-        self._training_params["epochs"] = epochs
+        self.params.train.set_epochs(epochs)
     
     def set_batch_size(self, batch_size):
         """
@@ -105,7 +137,7 @@ class Base:
         None.
 
         """
-        self._training_params["batch_size"] = batch_size
+        self.params.train.set_batch_size(batch_size)
         
     def set_validation_split(self, validation_split):
         """
@@ -121,7 +153,7 @@ class Base:
         None.
 
         """
-        self._training_params["validation_split"] = validation_split
+        self.params.train.set_validation_split(validation_split)
     
     def set_dropout_rate(self, dropout_rate):
         """
@@ -137,9 +169,9 @@ class Base:
         None.
 
         """
-        self._training_params["dropout_rate"] = dropout_rate
+        self.params.train.set_dropout_rate(dropout_rate)
         
-    def set_learning_rate(self, learning_rate):
+    def set_learning_rate(self, eta):
         """
         Sets ratio between activated and inactive nodes.
 
@@ -153,9 +185,29 @@ class Base:
         None.
 
         """
-        self._training_params["learning_rate"] = learning_rate
+        self.params.train.set_eta(eta)
+        
+    def set_optimizer(self, optimizer):
+        """
+        Sets ratio between activated and inactive nodes.
 
-# getters
+        Parameters
+        ----------
+        learning_rate : float
+            Learning rate.
+
+        Returns
+        -------
+        None.
+
+        """
+        try:
+            if optimizer.__module__ == 'keras.optimizers':
+                return
+        except:
+            self.params.train.set_optimizer(optimizer)
+
+    # getters
     def get_layer(self, layer_name):
         """
         Parameters
@@ -207,45 +259,102 @@ class Base:
             return weights
 
     def get_model(self):
+        """
+        Getter function for the generic model.
+
+        Returns
+        -------
+        model : Model
+            Keras model of the generic neural network.
+
+        """
+        
         inputs = self.input_layer
         outputs = self.output_layer
-        self.model = Model(inputs = inputs, outputs = outputs, name = f"ANN ({self._building_params[f'architecture_type']})")
+        name = self._building_params['architecture_type']
+        self.model = Model(inputs=inputs, 
+                           outputs=outputs)
+        #sets plot functions (only available when model instantiated)
+        self._plot = DNN(self)
         return self.model
     
     def compile_model(self):
+        """
+        Compiles the generically built model.
+
+        Returns
+        -------
+        None.
+
+        """
+        
         self.get_model()
-        optimizer = keras.optimizers.adam(learning_rate = self._training_params["learning_rate"])
-        self.model.compile(optimizer = optimizer, 
-                           loss = self._training_params["loss"], 
-                           metrics = [self._training_params["metric"]])
+        self.model.compile(optimizer=self.params.train.optimizer, 
+                           loss=self.params.train.loss, 
+                           metrics=[self.params.train.metric])
         self._get_layer_names()
         
     def fit_model(self):
+        """
+        Fits the generically built model.
+
+        Returns
+        -------
+        history : Model history
+            Training history of the neural network.
+
+        """
         self.compile_model()
         x = self.data.X_train
         y = self.data.y_train
-        history = self.model.fit(x = x, y = y, 
-                                 epochs = self._training_params["epochs"], 
-                                 batch_size = self._training_params["batch_size"], 
-                                 validation_split = self._training_params["validation_split"])
+        history = self.model.fit(x=x, 
+                                 y=y, 
+                                 epochs=self.params.train.epochs, 
+                                 batch_size=self.params.train.batch_size, 
+                                 validation_split=self.params.train.validation_split)
         return history
     
     def train_model(self):
+        """
+        Trains the generically built model. Same functionality as 
+        'fit_model()'.
+
+        Returns
+        -------
+        history : Model history
+            Training history of the neural network.
+
+        """
         if not hasattr(self, 'history'):
             self.model = self.get_model()
             self.compile_model()
             self.history = self.fit_model()
         return self.history
     
-    def test_model(self, x_test, y_test = None, model = None):
+    def test_model(self, X_test, y_test = None, model = None):
+        """
+        Tests the generically built model.
+
+        Parameters
+        ----------
+        X_test : ndarray
+            The testdataset.
+        y_test : ndarray, optional
+            The label dataset. The default is None.
+        model : Model, optional
+            The model that is tested. The default is None.
+
+        Returns
+        -------
+        y_pred : ndarray
+            The guessed labels.
+
+        """
         if model is None:
             model = self.model
         self.model_type = self.model.name
-        self.x_test, self.y_test = self._convert_data(x_test, y_test)
-        x_test_length = len(self.x_test)
-        if self.model_type == "spectral_net":
-            x_test = [self.x_test, self.generator.x_train[0 : x_test_length]]
-        y_pred = model.predict(x_test)
+        self.X_test, self.y_test = self._convert_data(X_test, y_test)
+        y_pred = model.predict(X_test)
         return y_pred
 
     def save_model(self):
@@ -266,7 +375,6 @@ class Base:
         print("Saved model to disk")
     
     def load_model(self, model_path):
-
         self.model_type = model_path.split("/")[1]
         self.architecture_type = model_path.split("/")[2]
         self.model = keras.models.load_model(model_path)

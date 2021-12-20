@@ -1,2 +1,3 @@
-from . import plot
+from . import log
 from . import syntax
+from . import time

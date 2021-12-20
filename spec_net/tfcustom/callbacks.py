@@ -1,14 +1,19 @@
-# TODOS:
+# TODOs:
 # - Implementation of the ability for using callback in conv layers
-
 import numpy as np
-from keras.callbacks import Callback # inherits from keras callbacks
+from tensorflow.keras.callbacks import Callback # inherits from keras callbacks
 
 # callback information variables in different containers:
-from .utils.callback import CallbackLog, CallbackParams, CallbackTrigger
+from .utils._callback import CallbackLog, CallbackParams, CallbackTrigger
+from ..utils.syntax import add_params
+from ..preprocess import dataformat as df
             
 class FeatureSelection(Callback):
-    def __init__(self, layer_name, n_features=None, callback=None):
+    def __init__(self, 
+                 validation_data,
+                 layer_name, 
+                 n_features=None, 
+                 callback=None):
         """
         This class is a customized callback function to iteratively delete all 
         the unnecassary input nodes (n_in) of a 'LinearPass' layer. The number 
@@ -16,7 +21,7 @@ class FeatureSelection(Callback):
         given metric. 
         
         The reduction or killing process is triggered whenever the threshold 
-        is surpassed for a given interval (e.g. 90% accuracy for at least 15 
+        is surpassed for a given interval (e.g. 90 % accuracy for at least 15 
         epochs).
         
         The reduction function itself is an exponential or linear approximation 
@@ -51,14 +56,43 @@ class FeatureSelection(Callback):
 
         """
         super().__init__()
+        self.set_params(params=callback)
+        
+        self.validation_data = self.get_validation_subset(validation_data,
+                                                          self.params.n_samples)
+        self.I = self.get_identity(self.params.loocv)
         
         self.layer_name = layer_name
         self.n_features = n_features
+       
+    def __repr__(self):
+        return 'Feature Selection Callback'
+    
+    def set_params(self, params):
+        """
+        Overwrites the original set_params() in Keras' Callback class and sets
+        a parameter class for this specific callback, where all the necessary
+        parameters are saved in the class object of type CallbackParams.
+
+        Parameters
+        ----------
+        params : dict
+            The callback dictionary with all the paramter information for the
+            instantiation of CallbackParams class.
+
+        Returns
+        -------
+        None.
+
+        """
+        if params is None:
+            self.params = CallbackParams()
         
-        if callback is None:
-            self.fs_params = CallbackParams()
+        elif 'callback' in params.keys():
+            self.params = CallbackParams(**params['callback'])
+        
         else:
-            self.fs_params = CallbackParams(**callback)
+            return
         
     def on_epoch_end(self, epoch, logs={}):
         """
@@ -87,7 +121,8 @@ class FeatureSelection(Callback):
         None.
 
         """
-        self._initialize(logs)
+        if not hasattr(self, 'log'):
+            self.initialize(logs)
         
         self._first_condition(logs)
         
@@ -97,6 +132,116 @@ class FeatureSelection(Callback):
         
         self._stop_model(epoch, logs)
         
+    # internal functions to generate the validation data set for the 
+    # feature evaluation task
+    def get_identity(self, inv):
+        """
+        Provides an identity matrix or bitwise inverted identity matrix, 
+        respectively. The matrix also considers the already pruned nodes. The 
+        inverted identity matrix corresponds to the LOOCV approach and is just
+        masking one node at a time. The uninverted matrix behaves like a mask 
+        that only allows one node at each validation step at all.
+
+        Parameters
+        ----------
+        inv : bool
+            Defines whether the identity matrix has to be inverted bitwise. If 
+            True, it is inverted.
+
+        Returns
+        -------
+        I : ndarray
+            The resulting identity matrix.
+
+        """
+        I = np.identity(self.validation_data[0].shape[1])
+        
+        if inv: # bitwise inversion
+            I = np.ones(I.shape) - I
+        
+        return I
+    
+    def get_validation_subset(self, validation_data, n_samples):
+        """
+        Extracts an arbitrary subset from the validation data as an input for
+        the feature selection algorithm.
+
+        Parameters
+        ----------
+        n_samples : int, optional
+            The number of samples per class that are evaluated by the feature
+            selection algorithm.
+
+        Returns
+        -------
+        validation_data : tuple
+            The validation data array and the corresponding labels.
+        n_samples : int
+            The validation subset label array.
+
+        """
+        data, labels = validation_data
+        
+        if n_samples:
+            classes = np.unique(labels)
+            indices = []
+            for c in classes:
+                indices.append(np.argwhere(labels==c).flatten()[:n_samples])
+            indices = np.array(indices).flatten()
+            
+            data, labels = data[indices], labels[indices]
+        
+        return (data, labels)
+    
+    def map_validation_data(self):
+        data, labels = self.validation_data
+        n_samples, n_in = data.shape
+        
+        # one-hot-encoding function:
+        labels_one_hot = df.one_hot(labels)
+        
+        n_c = labels.shape[1]
+        
+        # create new data containers for validation data and labels
+        validation_data = np.empty([n_samples * self.log.n_features[-1],
+                                    n_in])
+        validation_labels = np.zeros([n_samples * self.log.n_features[-1],
+                                      n_c])
+        
+        for i, idx in enumerate(self.log.index[-1]):
+            lb = i * n_samples 
+            ub = (i + 1) * n_samples
+            validation_data[lb : ub] = data * self.I[idx]
+            validation_labels[lb : ub] = labels_one_hot
+        
+        return validation_data, validation_labels
+        
+        
+    def initialize(self, logs):
+        """
+        Instantiates the remaining callback containers: Log and Trigger. 
+
+        Parameters
+        ----------
+        logs : dict
+            Contains information on the training results (accuracy and loss 
+            values).
+
+        Returns
+        -------
+        None.
+
+        """
+        self.log = CallbackLog(self.params, self.model, self.layer_name)
+        self.log.initialize(logs)
+        
+        self.trigger = CallbackTrigger(self.params, self.model, 
+                                       self.layer_name)
+        self.trigger.initialize(logs)
+        
+        self.n_classes = len(np.unique(self.validation_data[1]))
+        self.n_in = self.log.n_features[0]
+    
     def get_callback_keys(self):
         """
         Returns a list of possible callback parameter keywords. 
@@ -107,7 +252,7 @@ class FeatureSelection(Callback):
             List of possible callback parameter keywords.
 
         """
-        keys = self.fs_params.__dict__.keys()
+        keys = self.params.__dict__.keys()
         return keys
     
     # check functions: accuracy or loss based feature selection callback?
@@ -132,7 +277,7 @@ class FeatureSelection(Callback):
         c = self.trigger.gradient
         d = self.trigger.outcome
         
-        if self.fs_params.metric in ['accuracy', 'val_accuracy']:
+        if self.params.metric in ['accuracy', 'val_accuracy']:
             b, d = d, b
         
         if a and b:
@@ -174,21 +319,25 @@ class FeatureSelection(Callback):
 
         """
         
-        if (self.trigger.criterion_features and
-            self.trigger.d > self.fs_params.d_min):
+        if self.trigger.criterion_max and self.trigger.criterion_features:
+            weights, loss = self._prune_weights(epoch)
+            self.log.update(epoch, loss)
+            self.trigger.converged = True
             self.model.stop_training = True
-            print(f"Epoch {epoch}: Successful feature selection\n"
-                  f"Stopped training with '{self.fs_params.metric}' of "
-                  f"{logs[self.fs_params.metric]} using "
+            print(f"Epoch {epoch} - Successful Feature Selection:\n"
+                  f"Stopped training with '{self.params.metric}' of "
+                  f"{logs[self.params.metric]} using "
                   f"{self.log.n_features[-1]} nodes as input features.")
         
         elif self.trigger.criterion_max:
+            weights, loss = self._prune_weights(epoch)
+            self.log.update(epoch, loss)
             self.model.stop_training = True
-            print(f"Epoch {epoch}: Non convergent\n"
+            print(f"Epoch {epoch} - Non Convergent:\n"
                   "The optimizer did not converge. Please adjust the feature "
                   "selection and/or model parameters and try again.\n\nStopped "
-                  f"training with '{self.fs_params.metric}' of "
-                  f"{logs[self.fs_params.metric]} using "
+                  f"training with '{self.params.metric}' of "
+                  f"{logs[self.params.metric]} using "
                   f"{self.log.n_features[-1]} nodes as input features.")
     
     #update functions: weights and stopping criteria
@@ -213,7 +362,7 @@ class FeatureSelection(Callback):
         layer = self.model.get_layer(self.layer_name)
         
         if (not self.trigger.criterion_features and
-            self.trigger.d >= self.fs_params.d_min):
+            self.trigger.d >= self.params.d_min):
             
             weights, loss = self._prune_weights(epoch) # pruned weights
             
@@ -226,7 +375,7 @@ class FeatureSelection(Callback):
             self.log.update(epoch, loss)
             self.trigger.update_trigger(logs)
         
-            print(f"Epoch {epoch}: Weight Update\n"
+            print(f"Epoch {epoch} - Weight Update:\n"
                   f"Pruned {int(len(weights) - np.sum(weights))} feature(s). "
                   f"Left with {self.log.n_features[-1]} feature(s).\n")
         
@@ -250,173 +399,8 @@ class FeatureSelection(Callback):
             self.trigger.criterion_features = True
         
         #stopping criterion 2
-        if self.trigger.d_prune >= self.fs_params.d_max:
+        if self.trigger.d_prune >= self.params.d_max:
             self.trigger.criterion_max = True
-    
-    def _initialize(self, logs):
-        """
-        Instantiates the remaining callback containers: Log and Trigger. 
-
-        Parameters
-        ----------
-        logs : dict
-            Contains information on the training results (accuracy and loss 
-            values).
-
-        Returns
-        -------
-        None.
-
-        """
-        if not hasattr(self, 'log'):
-            self.log = CallbackLog(self.fs_params,
-                                   self.model, 
-                                   self.layer_name)
-            self.trigger = CallbackTrigger(self.fs_params,
-                                           self.model, 
-                                           self.layer_name)
-            self.log.initialize(logs)
-            self.trigger.initialize(logs)
-            labels = self.validation_data[1]
-            self.n_classes = len(np.unique(labels))
-            self.n_in = len(self.log.weights[0])
-
-    # internal functions to generate the validation data set for the 
-    # feature evaluation task
-    def get_identity(self, inv):
-        """
-        Provides an identity matrix or bitwise inverted identity matrix, 
-        respectively. The matrix also considers the already pruned nodes. The 
-        inverted identity matrix corresponds to the LOOCV approach and is just
-        masking one node at a time. The uninverted matrix behaves like a mask 
-        that only allows one node at each validation step at all.
-
-        Parameters
-        ----------
-        inv : bool
-            Defines whether the identity matrix has to be inverted bitwise. If 
-            True, it is inverted.
-
-        Returns
-        -------
-        I_pruned : ndarry
-            The resulting identity matrix that also takes the weights (already
-            pruned nodes) into account.
-
-        """
-        I = np.identity(self.n_in)
-        
-        if inv: # bitwise inversion
-            I = np.ones(I.shape) - I
-        
-        I_pruned = I * self.log.weights[-1] # pruning of identity matrix
-        
-        return I_pruned
-    
-    def _get_validation_subset(self, n_samples):
-        """
-        Extracts an arbitrary subset from the validation data as an input for
-        the feature selection algorithm.
-
-        Parameters
-        ----------
-        n_samples : int, optional
-            The number of samples per class that are evaluated by the feature
-            selection algorithm.
-
-        Returns
-        -------
-        data : ndarray
-            The validation subset data array.
-        labels : ndarray
-            The validation subset label array.
-
-        """
-        data, labels = self.validation_data[0:2]
-        indices = np.argsort(labels, axis=0).flatten()
-        
-        data = data[indices]
-        labels = labels[indices]
-
-        return data, labels
-    
-    def _prune_validation_subset(self, data, labels, I, n_samples):
-        """
-        Prunes the validation data set such that only the given number of 
-        samples is taken into account for the evaluation (necessary for big
-        data sets for runtime acceleration).
-
-        Parameters
-        ----------
-        data : ndarray
-            The data matrix that shall be used for validation.
-        labels : ndarray
-            The corresponding label matrix.
-        I : ndarray
-            The (inverse) identity matrix for the LOOCV.
-        n_samples : int
-            Number of samples that shall be kept as validation data.
-
-        Returns
-        -------
-        prediction_data : ndarray
-            Pruned data.
-        prediction_labels : ndarray
-            Pruned labels.
-
-        """
-        prediction_data = np.zeros([n_samples * self.log.n_features[-1], 
-                                    self.n_in])
-        
-        prediction_labels = np.zeros([n_samples * self.log.n_features[-1],
-                                      self.n_classes]) 
-        
-        m = 0
-        for i in range(self.n_in):
-            if self.log.weights[-1][i] != 0:
-                for n in range(n_samples):
-                    prediction_data[m] = data[n] * I[i]
-                    # one hot encoding of labels
-                    j = labels[n]
-                    prediction_labels[m, j] = 1
-                    m += 1
-        
-        return prediction_data, prediction_labels
-    
-    def _get_prediction_data(self, inv):
-        """
-        Provides the data for the evaluation of importances.
-
-        Parameters
-        ----------
-        inv : bool
-            Decides whether the inverse or the identity matrix itself is used 
-            for the feature selection algorithm. If it is inversed, it will
-            execute the feature selection based on the leave-one-out 
-            cross-validation (LOOCV).
-
-        Returns
-        -------
-        X : ndarray
-            The data that is predicted by the model.
-        y : ndarray
-            The corresponding labels.
-
-        """
-        I = self.get_identity(inv)
-        
-        if not self.fs_params.n_samples:
-            data = np.ones([self.n_classes, len(I)])
-            labels = np.arange(self.n_classes)
-        
-        else:
-            data, labels = self._get_validation_subset(self.fs_params.n_samples)
-        
-        n_samples = self.fs_params.n_samples  
-
-        X, y = self._prune_validation_subset(data, labels, I, n_samples)
-        
-        return X, y
     
     def _get_n_features(self):
         """
@@ -444,12 +428,16 @@ class FeatureSelection(Callback):
             corresponding function for it.
         
         """
-        if self.fs_params.pruning_type == "exponential":
-            n_features = int(self.n_in * (1 - self.fs_params.pruning_rate) 
+        if self.params.pruning_type == "exponential":
+            n_features = int(self.n_in * (1 - self.params.pruning_rate) 
                              ** len(self.log.pruning_epochs))
+            
+            # if the same int is calculated twice, it will be subtracted by one
+            if n_features == self.log.n_features[-1]:
+                n_features -= 1
         
-        elif self.fs_params.pruning_type == "linear":
-            n_features = int(self.n_in - (self.fs_params.n_prune
+        elif self.params.pruning_type == "linear":
+            n_features = int(self.n_in - (self.params.n_prune
                                           * len(self.log.pruning_epochs)))
         
         else:
@@ -483,9 +471,15 @@ class FeatureSelection(Callback):
         # the convenience factor is an adaptive factor that shall encourage 
         # the feature selection callback to trigger after the second stage 
         # pruning trigger is not pulled in the first few attempts 
-        convenience_factor = self.fs_params.d_min / self.trigger.d
+        # if self.trigger.d >= self.params.d_min:
+        #     convenience_factor = self.params.d_min / self.trigger.d
+        # else:
+        #     convenience_factor = 1.0
         
-        if self.fs_params.loocv: # highest H_features shall endure
+        if n_features == self.log.n_features[-1]:
+            index = self.log.index[-1]
+        
+        elif self.params.loocv: # highest H_features shall endure
             prune = H_features[np.argsort(H_features)[:-n_features]]
             keep_index = np.argsort(H_features)[-n_features:]
             keep = H_features[keep_index]
@@ -493,8 +487,8 @@ class FeatureSelection(Callback):
             keep_max = np.amax(keep)
             # the difference between kept and pruned features shall be at 
             # least 10 % of the maximum loss value 
-            if (keep_max - prune_max) >= (self.fs_params.d_loss_ratio 
-                                          * convenience_factor 
+            if (keep_max - prune_max) >= (self.params.d_loss_ratio 
+                                          # * convenience_factor 
                                           * keep_max):
                 index = self.log.index[-1][keep_index]
             else:
@@ -510,8 +504,8 @@ class FeatureSelection(Callback):
             keep_min = np.amin(keep)
             # the difference between kept and pruned features shall be at 
             # least 10 % of the minimum loss value
-            if (prune_min - keep_min) >= (self.fs_params.d_loss_ratio 
-                                          * convenience_factor 
+            if (prune_min - keep_min) >= (self.params.d_loss_ratio 
+                                          # * convenience_factor 
                                           * prune_max):
                 index = self.log.index[-1][keep_index]
             else:
@@ -541,7 +535,7 @@ class FeatureSelection(Callback):
 
         """        
         # get prediction data for the measure
-        data, labels = self._get_prediction_data(self.fs_params.loocv)
+        data, labels = self.map_validation_data()
         
         P = labels
         Q = self.model.predict(data)
@@ -549,7 +543,7 @@ class FeatureSelection(Callback):
         
         # cross-entropy H measures uncertainty of possible outcomes and is the 
         # best suited loss metric for multiclass classification tasks
-        H_samples = self.fs_params.calculate_loss(P, Q) # loss for all samples
+        H_samples = self.params.calculate_loss(P, Q) # loss for all samples
         
         # arranges sample losses according to their respective feature
         H_feature_samples = np.array(np.array_split(H_samples, 

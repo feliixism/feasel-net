@@ -1,15 +1,10 @@
-
-from keras import activations, initializers, regularizers, constraints
-from keras.layers import Layer, Input, Dense, Conv2D, InputSpec
-from keras.utils import conv_utils
-from keras.constraints import NonNeg
-import keras.backend as K
-from keras.initializers import Constant
-from tensorflow.python.framework import dtypes, tensor_shape
+from tensorflow.keras import activations, initializers, regularizers, constraints
+from tensorflow.keras.layers import Layer, Dense, InputSpec
+from tensorflow.keras.constraints import NonNeg
+import tensorflow.keras.backend as K
+from tensorflow.keras.initializers import Constant
 import tensorflow as tf
 import numpy as np
-from tensorflow.python.util.tf_export import keras_export
-from .constraints import Clip, MinMaxClip
 
 class LinearPass(Layer):
     def __init__(self, 
@@ -58,6 +53,7 @@ class LinearPass(Layer):
         self.input_spec = InputSpec(min_ndim=2, axes={-1: input_dim})
         self.built = True
     
+    # @tf.autograph.experimental.do_not_convert
     def call(self, inputs):
         output = inputs * self.kernel
         if self.use_bias:

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import PercentFormatter
 from .image_plot_conversion import extract_SDBS_data
 from .data import resample
-from spec_net.analysis.time import timer
+from ..utils.time import timer
 from spec_net.preprocess.filter import Filter
 from scipy.interpolate import interp1d
 

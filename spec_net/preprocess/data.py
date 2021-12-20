@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.signal import resample as scipy_resample
 
-def resample(arr, num, axis = 0):
+def resample(arr, num, axis=0):
     """
     Resamples the data along specified axis.
 
@@ -24,7 +24,7 @@ def resample(arr, num, axis = 0):
     resampled = scipy_resample(arr, num, axis = axis)
     return resampled
 
-def scatter_matrix(arr, rowvar = True):
+def scatter_matrix(arr, rowvar=True):
     if not rowvar:
         arr = arr.T
     mu = np.mean(arr, axis = 1, keepdims = True)
@@ -32,7 +32,7 @@ def scatter_matrix(arr, rowvar = True):
     S = X @ X.T
     return S
 
-def covariance(arr, rowvar = True):
+def covariance(arr, rowvar=True):
     """
     Calculates the covariance of an array.
     The covariance shows how much a variable is related to another.
@@ -58,7 +58,7 @@ def covariance(arr, rowvar = True):
     cov = S / (n - 1)
     return cov
 
-def correlation(arr, rowvar = True):
+def correlation(arr, rowvar=True):
     """
     Calculates the Pearson correlation coefficients of the input matrix.
     Pearsons correlation only refers to linear relations between two variables.
@@ -80,4 +80,30 @@ def correlation(arr, rowvar = True):
     corr = D_inv @ cov @ D_inv
     return corr
 
+def synchronous(arr, rowvar=True):
+    synchr = covariance(arr, rowvar)
+    return synchr
 
+def asynchronous(arr, rowvar=True):
+    if not rowvar:
+        arr = arr.T
+    m, n = arr.shape 
+    mu = np.mean(arr, axis = 1, keepdims = True)
+    X = arr - mu
+    
+    def hilbert_noda(arr):
+        
+        N = np.empty([m, n])
+        for j in range(m):
+            for k in range(n):
+                if j == k:
+                    N[j,k] = 0
+                else:
+                    N[j,k] = 1 / (np.pi * (k-j))
+        return N
+    
+    N = hilbert_noda(X)
+    
+    S = X @ (X * N).T
+    asynchr = S / (n - 1)
+    return asynchr
