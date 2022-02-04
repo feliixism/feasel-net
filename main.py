@@ -1,43 +1,53 @@
 import numpy as np
 from spec_net.feasel import DNN
-from spec_net.utils.log import _tf_warnings
-
-_tf_warnings('3')
 
 data_path = "data/wine/"
 X = np.load(data_path + "data.npy")
 y = np.load(data_path + "labels.npy")
 features = np.load(data_path + "features.npy").squeeze()
 
-feasel = DNN(X, y,
-    layer_name='Linear',
-    n_features=3, 
-    callback={'metric': "accuracy", 
-              'd_min': 30,
-              'd_max': 300,
-              'n_samples': None,
-              'thresh': 0.98,
-              'decay': 0.001,
-              'pruning_type':'linear',
-              },
-    features=features, 
-    architecture_type='const',
-    normalization='min-max', 
-    activation='relu',
-    loss = 'categorical_crossentropy')
+FS = DNN(X, y,
+         layer_name='Linear',
+         n_features=3,
+         callback={'eval_metric': 'accuracy',
+                   'd_min': 30,
+                   'd_max': 300,
+                   'n_samples': None,
+                   'thresh': 0.70,
+                   'decay': 0.0005,
+                   'pruning_type':'linear',
+                   },
+         features=features,
+         architecture_type='exp-down',
+         normalization='min-max',
+         activation='relu',
+         loss = 'categorical_crossentropy')
 
-feasel.set_n_layers(2)
-feasel.set_learning_rate(0.0003)
-feasel.set_batch_size(16)
-feasel.set_epochs(2000)
+FS.set_n_layers(3)
+FS.set_learning_rate(0.002)
+FS.set_batch_size(32)
+FS.set_epochs(200)
 
-feasel.train_model()
+FS.train_model()
 
-feasel.plot.input_reduction('both', highlight = True)
-feasel.plot.history()
-feasel.plot.pruning_history()
-feasel.plot.model()
-feasel.model.summary()
+FS.callback
 
-#too random --> the solution is maybe in callback decay?
-feasel.data.y_train
+FS.callback.trigger._converged
+
+FS.time
+FS._building_params['architecture_type']
+# y_pred, y_true = feasel.test_model(X, y)
+
+FS.name
+# # feasel.plot.input_reduction('both', highlight = True)
+FS.plot.feature_entropy()
+FS.plot.feature_history()
+FS.plot.pruning_history()
+FS.plot.history()
+# FS.plot.predict(X[1], y[1])
+# # feasel.plot.predict_set(X, y, 'all')
+# # feasel.plot.predict_set(X, y, 'accuracy')
+# # feasel.plot.predict_set(X, y, 'recall')
+# # feasel.plot.predict_set(X, y, 'precision')
+# feasel.model.summary()
+FS.plot.confusion_matrix(X, y)

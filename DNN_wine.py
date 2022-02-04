@@ -10,7 +10,7 @@ features = np.arange(600, 600+len(features))
 dnn = DenseDNN(X, y,
     features=features, 
     architecture_type='exp-down',
-    normalization='min_max', 
+    normalization='min-max', 
     activation='relu')
 
 dnn.set_n_layers(2)

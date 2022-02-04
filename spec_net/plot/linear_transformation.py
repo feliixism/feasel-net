@@ -7,7 +7,7 @@ from spec_net.preprocess.data import covariance
 from spec_net.plot.utils._visualization import confidence
 from spec_net.plot.utils import _default
 
-class LinearTransformation:
+class LinearTransformationVisualizer:
     def __init__(self, analysis):
         """
         The base plot class for all implemented linear transformation 

@@ -2,7 +2,7 @@ import numpy as np
 
 def get_indices(array):
     """
-    Provides a list with the indices of an array that indicates where to find 
+    Provides a list with the indices of an array that indicates where to find
     the data for each particular class or label.
 
     Parameters
@@ -16,20 +16,24 @@ def get_indices(array):
         A list with the indices.
 
     """
-    labels = np.unique(array, axis=0)
+    labels, idx = np.unique(array, axis=0, return_index=True)
+    labels = labels[idx.argsort()]
+
+    if len(array.shape) == 1:
+      array = np.array(array, ndmin=2).T
 
     l_indices = []
     for i, label in enumerate(labels):
-        l_indices.append(np.argwhere(array == label))
-    
+        l_indices.append(np.argwhere(np.all(array == label, axis=-1)))
+
     return l_indices
 
 def categorical(array):
     """
     Converts an one-hot encoded array into a categorical array. If the array is
-    categorical already, it will be manipulated such that the neural network 
-    can interpret the labels, i.e. it will rename the classes into an 
-    enumeration of integers starting from 0 to the number of classes n_c - 1 
+    categorical already, it will be manipulated such that the neural network
+    can interpret the labels, i.e. it will rename the classes into an
+    enumeration of integers starting from 0 to the number of classes n_c - 1
     (is obsolete when already happened).
 
     Parameters
@@ -45,13 +49,13 @@ def categorical(array):
     # it will convert the label array in an interpretable label array for the
     # neural network
     l_indices = get_indices(array) # provides a list of indices
-    
+
     # creates the empty categorical array:
-    categorical = np.zeros(len(array)) 
+    categorical = np.zeros(len(array))
     for i, indices in enumerate(l_indices):
         # array will be the i-th class in the specific indices
         categorical[indices] = i
-    
+
     return categorical
 
 def one_hot(array):
@@ -70,16 +74,28 @@ def one_hot(array):
         An array of the one-hot encoded labels.
     """
     l_indices = get_indices(array) # provides a list of indices
-        
-    # creates the empty one-hot encoded array:
-    one_hot = np.zeros([len(array), len(l_indices)]) 
-    for i, indices in enumerate(l_indices):
+
+    # chek if one-hot already:
+    if (array.ndim != 2) and (np.unique(array) != [0,1]):
+      # creates the empty one-hot encoded array:
+      one_hot = np.zeros([len(array), len(l_indices)])
+      for i, indices in enumerate(l_indices):
         # array will be one, only if it is found in the i-th class
-        one_hot[indices, i] = 1 
-    
+          one_hot[indices, i] = 1
+    else:
+      one_hot = array
     return one_hot
 
-def shape_ann(x, y):
+def shape(X, y):
+  SHAPE = {2: _ann,
+           3: _1d_conv,
+           4: _2d_conv,
+           5: _3d_conv}
+  dims = X.ndim
+  SHAPE[dims](X, y)
+
+
+def _ann(X, y):
     if len(x.shape) != 2:
         old_shape = x.shape
         x = x.reshape([len(y), int(len(x.flatten()) / len(y))])
@@ -88,99 +104,79 @@ def shape_ann(x, y):
         print(f"Shape {x.shape} is already correct.")
     return x
 
-def shape_1d_cnn(x, y, features = 1):
-    if len(x.shape) != 3:
-        old_shape = x.shape
-        x = x.reshape([len(y), int(len(x.flatten()) / (len(y) * features)), features])
-        print(f"Shape {old_shape} is converted to shape {x.shape}.")
-    else:
-        print(f"Shape {x.shape} is already correct.")
-    return x
+def _1d_conv(X, y, features = 1):
+  if len(x.shape) != 3:
+    old_shape = x.shape
+    x = x.reshape([len(y), int(len(x.flatten()) / (len(y) * features)), features])
+    print(f"Shape {old_shape} is converted to shape {x.shape}.")
+  else:
+    print(f"Shape {x.shape} is already correct.")
+  return x
 
-def min_max(array, 
-                  axis=None, 
-                  a_max=1., 
-                  a_min=0.):
-    """
-    Scales the original array such that it fits in between a maximum value 
-    a_max and a minimum value a_min. 
+def _2d_conv(X, y, features):
+  return
 
-    Parameters
-    ----------
-    array : ndarray
-        The original data array.
-    axis : int, optional
-        The axis along which the scaling is undertaken. If 'None', it will 
-        scale the complete array. The default is None.
-    a_max : float, optional
-        The new maximum value of the data after scaling. The default is 1.
-    a_min : TYPE, optional
-        The new minimum value of the data after scaling. The default is 0.
+def _3d_conv(X, y):
+  return
 
-    Returns
-    -------
-    scaled : ndarray
-        The scaled array.
+def min_max(X, axis=-1, a_max=1., a_min=0.):
+  """
+  Scales the original array such that it fits in between a maximum value a_max
+  and a minimum value a_min. The old values are described by A_max and A_min.
 
-    """
-    # creates an empty container in the shape of the original array
-    scaled = np.zeros(array.shape)
-    
-    # if there is an axis specified, it will take the values along this axis
-    # and apply the scaling along the resulting sub-array 
-    if axis is not None:
-        n = array.shape[axis] # number of sub arrays
-        
-        for i in range(n):
-            # min-max scaling of the sub-arrays
-            sub_array = np.take(array, i, axis=axis)
-            _a_max = np.amax(sub_array)
-            _a_min = np.amin(sub_array)
-            scale = (a_max-a_min) / (_a_max-_a_min) # the scaling factor
-            offset = a_max - scale*_a_max # an offset after scaling
-            y = scale*sub_array + offset
-            scaled = np.insert(scaled, i, y, axis=axis)
-        scaled = np.take(scaled, np.arange(n), axis=axis)
-    
-    else:
-        _a_max = np.amax(array)
-        _a_min = np.amin(array)
-        scale = (a_max - a_min) / (_a_max - _a_min) # the scaling factor
-        offset = a_max - scale * _a_max # an offset after scaling
-        scaled = scale * array + offset
-    
-    return scaled
+  Parameters
+  ----------
+  X : ndarray
+    The original data array.
+  axis : int, optional
+    The axis along which the scaling is undertaken. If 'None', it will scale
+    the complete array. The default is -1.
+  a_max : float, optional
+    The new maximum value of the data after scaling. The default is 1.
+  a_min : float, optional
+    The new minimum value of the data after scaling. The default is 0.
 
-def standardize(arr, axis = -1):
-    """
-    Calculates the standardized score of the sample features.
+  Returns
+  -------
+  array_n : ndarray
+    The min-max normalized array.
+
+  """
+  A_max = np.amax(X, axis=axis, keepdims=True) # previous max entry
+  A_min = np.amin(X, axis=axis, keepdims=True) # previous min entry
+
+  scale = (a_max - a_min) / (A_max - A_min) # scaling factor
+  offset = a_max - scale * A_max # offset factor
+
+  X_min_max = scale * X + offset # new normalized array
+
+  return X_min_max
+
+def standardize(array, axis = -1):
+  """
+  Calculates the standardized score of the sample features.
 
     z = (x - x_bar) / s
 
-    where x_bar is the arithmetic mean and s the standard deviation for each 
-    feature. The features are described by the given axis.
-    
-    Parameters
-    ----------
-    arr : np-array (float)
-        The original data array.
-    axis : TYPE, optional
-        Determines the axis of the features. The default is -1.
+  where x_bar is the arithmetic mean and s the standard deviation for each
+  feature. The features are described by the given axis.
 
-    Returns
-    -------
-    new_arr : np-array (float)
-        The standard score of the original data array.
+  Parameters
+  ----------
+  arr : ndarray (float)
+    The original data array.
+  axis : int, optional
+    Determines the axis of the features. The default is -1.
 
-    """
-    new_arr = np.zeros(arr.shape)
-    
-    n = arr.shape[axis]
-    for i in range(n):
-        x = np.take(arr, i, axis = axis)
-        mu = np.mean(x)
-        sigma = np.sqrt(np.var(x))
-        y = (x - mu) / sigma
-        new_arr = np.insert(new_arr, i, y, axis = axis)
-    new_arr = np.take(new_arr, np.arange(n), axis = axis)
-    return new_arr
+  Returns
+  -------
+  array_n : ndarray (float)
+    The standard score normalized array.
+
+  """
+  x_bar = np.mean(array, axis=axis, keepdims=True) # arithmetic mean
+  s = np.std(array, axis=axis, keepdims=True) # standard deviation
+
+  array_n = (array - x_bar) / s
+
+  return array_n

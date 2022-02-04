@@ -4,14 +4,19 @@ import matplotlib
 import mplcursors
 from scipy.linalg import eigh
 from spec_net.preprocess.data import covariance, correlation
-from spec_net.plot import LinearTransformation
+from spec_net.plot import LinearTransformationVisualizer as Visualizer
 # from spec_net.plot.visualization import format_label_string_with_exponent
 from .svd import SVD
 
 class PCA:
-    def __init__(self, X, y = None, n_components = 2, features = None, rowvar = True, standardize = False, solver = "eigs"):
+    def __init__(self, X, y = None,
+                 n_components = 2,
+                 features = None,
+                 rowvar = True,
+                 standardize = False,
+                 solver = "eigs"):
         """
-        A class environment for analysing X using the theory of principal 
+        A class environment for analysing X using the theory of principal
         component analysis. This is an unsupervised technique for dimensionality
         reduction.
 
@@ -24,14 +29,14 @@ class PCA:
         n_components : int, optional
             Sets the number of principal components. The default is 2.
         features : float
-            1D-Array with features. If 'None', the features are incremented 
+            1D-Array with features. If 'None', the features are incremented
             from 0 to N-1. The default is 'None'.
         rowvar : boolean, optional
-            Indicates the axis of the features. If features are described by 
-            the columns then set to 'False'. 
+            Indicates the axis of the features. If features are described by
+            the columns then set to 'False'.
             The default is True.
         standardize : boolean, optional
-            Optional standardization of the X along sample axis if set to 
+            Optional standardization of the X along sample axis if set to
             'True'. The default is False.
 
         Returns
@@ -41,21 +46,21 @@ class PCA:
         """
         self.X = X
         self.y = y
-        
+
         self._rowvar = rowvar
         if self._rowvar == False:
             self.X = self.X.T
-        
+
         if y is not None:
             classes = np.unique(y)
             self.n_classes = len(classes)
             self.classes = np.array([classes, np.arange(self.n_classes)])
-            self.log = self.get_log()      
-        
+            self.log = self.get_log()
+
         #number features
         self.n_features, self.n_samples = self.X.shape
         self.n_components = n_components
-        
+
         if features is None:
             idx = np.arange(self.n_features)
             self.features = {"idx": idx, "name": idx}
@@ -63,35 +68,42 @@ class PCA:
             idx = np.arange(self.n_features)
             features_label = np.array([features]).squeeze()
             self.features = {"idx": idx, "name": features_label}
-            
+
         #solver information
         self.solver = solver
-        
+
         #boolean features
         self._standardized = standardize
         self._eigs, self._loadings, self._scores = False, False, False
         self._preprocessed, self._reduced = False, False
         self._contribution = False
-        
+
         # embed plot class
-        self.plot = LinearTransformation(self)
-        
+        self._plot = Visualizer(self)
+
     def __repr__(self):
-        return f"PCA(n_features: {self.n_features}, n_samples: {self.n_samples}, n_components: {self.n_components}, standardized: {self._standardized})"
-    
+        return (f"PCA(n_features: {self.n_features}, "
+                f"n_samples: {self.n_samples}, "
+                "n_components: {self.n_components}, "
+                "standardized: {self._standardized})")
+
+    @property
+    def plot(self):
+      return self._plot
+
     def get_log(self):
         dict={}
         for class_ in self.classes[0]:
             data = self.X[ : , np.argwhere(self.y == class_)].squeeze()
             dict[f"{class_}"] = {"data": data}
         return dict
-    
+
     def preprocess(self):
         """
-        Mean-centering of the X. If 'standardized' is 'True', the X is 
-        also standardized by dividing it by the standard deviation of each 
+        Mean-centering of the X. If 'standardized' is 'True', the X is
+        also standardized by dividing it by the standard deviation of each
         variable.
-        
+
         Returns
         -------
         None.
@@ -100,13 +112,13 @@ class PCA:
         self.mu = np.mean(self.X, axis = 1, keepdims = True)
         self.sigma = np.std(self.X, axis = 1, ddof = 1, keepdims = True)
         if self._standardized == True:
-            sigma = self.sigma  
+            sigma = self.sigma
         else:
             sigma = np.ones(self.mu.shape)
-        
+
         self.preprocessed_X = (self.X - self.mu) / sigma
         self._preprocessed = True
-        
+
         #log information
         for class_ in self.classes[0]:
             data = self.preprocessed_X[ : , np.argwhere(self.y == class_)[:, 0]]
@@ -114,11 +126,11 @@ class PCA:
             self.log[f"{class_}"]["data"] = data
             self.log[f"{class_}"]["mu"] = np.mean(data, axis = 1, keepdims = True)
             self.log[f"{class_}"]["sigma"] = np.std(data, axis = 1, ddof = 1, keepdims = True)
-    
+
     # internal getters
     def get_eigs(self):
         """
-        Solves the eigenvalue problem of the quadratic covariance or 
+        Solves the eigenvalue problem of the quadratic covariance or
         correlation matrix respectively. The order of evecs and evals is sorted
         by the magnitude of the evals from highest to lowest.
 
@@ -129,7 +141,7 @@ class PCA:
         """
         if not self._preprocessed:
             self.preprocess()
-        
+
         if self.solver == "eigs":
             if self._standardized:
                 evals, evecs = eigh(correlation(self.preprocessed_X), lower = False)
@@ -137,17 +149,17 @@ class PCA:
                 evals, evecs = eigh(covariance(self.preprocessed_X), lower = False)
             evals = np.flip(evals)
             evecs = np.flip(evecs.T, 0)
-        
+
         elif self.solver == "svd": # Flipped signs every second row in evecs. Why?
             svd = SVD(self.preprocessed_X.T)
             U, Sigma, Vh = svd()
             evals, evecs = np.diagonal(Sigma)**2 / (self.n_samples - 1), Vh
-        
+
         self.var_scores = evals**2
         self.evals, self.evecs = np.array(evals, ndmin=2), evecs
         self.get_overall_explained_variance()
         self._eigs = True
-    
+
     def get_overall_explained_variance(self):
         """
         Calculates the overall explained variance of each principal component.
@@ -166,7 +178,7 @@ class PCA:
                 cev[0, i] = oev[0, i]
         self.oev = oev
         self.cev = cev
-    
+
     def get_loadings(self):
         """
         Calculates the so-called loading-factors of each principal component.
@@ -183,11 +195,11 @@ class PCA:
         self.loadings = (np.identity(len(self.evals[0]))*np.sqrt(self.evals[0])
                          @ self.evecs)
         self._loadings = True
-        
+
     def get_scores(self):
         """
         Calculates the values of the original features projected into the new
-        latent variable space described by the corresponding principal 
+        latent variable space described by the corresponding principal
         components.
 
         Returns
@@ -205,13 +217,13 @@ class PCA:
             self.log[f"{class_}"]["scores_mean"] = np.mean(self.log[f"{class_}"]["scores"], axis = 0)
         self.var_scores = np.var(self.scores, axis = 0, ddof = 1)
         self._scores = True
-        
+
     def get_reduced_X(self):
         if self._scores == False:
             self.get_scores()
         self.reduced_X = (self.scores @ self.evecs[:self.n_components]).T
         self._reduced = True
-    
+
     def plot_reduction(self):
         if self._reduced == False:
             self.get_reduced_X()
@@ -224,11 +236,11 @@ class PCA:
         axs[0].title.set_text("Original")
         axs[1].imshow(self.reduced_X.T)
         axs[1].title.set_text(f"Reduction: {reduction} \%; PSNR: {psnr:0.2f} dB")
-    
+
     def get_important_features(self, n_var, d_min = 0):
         """
-        A method to find the most relevant features in the Xset. This is 
-        done by sorting the loading values along each principal component, 
+        A method to find the most relevant features in the Xset. This is
+        done by sorting the loading values along each principal component,
         which is nothing else than the correlation of the original variable
         and the principal component.
 
@@ -250,7 +262,7 @@ class PCA:
             i_sorted = np.flip(np.argsort(np.abs(self.loadings.T)[:, component]))
             x_sorted = np.flip(self.features["name"][np.argsort(np.abs(self.loadings.T)[:, component])])
             a_sorted = np.flip(self.loadings[component][np.argsort(np.abs(self.loadings.T)[:, component])])
-            
+
             #generating dictionary with information about variable, correlation and index
             count = 0
             x, a, i = [], [], []
@@ -269,13 +281,13 @@ class PCA:
                     most_important_features[f"PC{component + 1}"] = {"var": x, "a": a, "i": i}
                     break
         return most_important_features
-    
+
     def get_contribution(self):
         if not self._contribution:
             if not self._loadings:
                 self.get_loadings()
             self.contribution = np.empty(self.loadings.shape)
             for i in range(len(self.loadings)):
-                self.contribution[i] = (np.abs(self.loadings[i]) 
+                self.contribution[i] = (np.abs(self.loadings[i])
                                         / np.sum(np.abs(self.loadings[i])))
             self._contibution = True

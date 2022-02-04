@@ -1,3 +1,3 @@
 from . import dnn
 
-from .dnn import FeaSelDNN as DNN
+from .dnn import FeaselDNN as DNN

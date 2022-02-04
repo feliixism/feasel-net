@@ -1,7 +1,7 @@
-from . import dnn
+from . import feasel
 from . import linear_transformation
 from . import save
 from . import utils
 
-from . dnn import DNN
-from . linear_transformation import LinearTransformation
+from . feasel import FeaselVisualizer
+from . linear_transformation import LinearTransformationVisualizer
