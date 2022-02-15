@@ -18,7 +18,7 @@ def get_timestamp():
     date = f"{t.tm_year}{str(t.tm_mon).zfill(2)}{str(t.tm_mday).zfill(2)}"
     clock = (f"{str(t.tm_hour).zfill(2)}{str(t.tm_min).zfill(2)}"
              f"{str(t.tm_sec).zfill(2)}")
-    timestamp = "_" + date + "_" + clock
+    timestamp = date + "_" + clock
     return timestamp
 
 timestamp = get_timestamp()
