@@ -12,13 +12,14 @@ FS = DNN(X, y,
          n_features=3,
          # 'data', 'train', 'build' or 'callback' parameters can also be set
          # within dictionaries:
-         callback={'eval_metric': 'accuracy',
+         callback={'eval_type': 'accuracy',
                    'd_min': 10,
                    'd_max': 300,
                    'n_samples': None,
-                   'thresh': 0.90,
+                   'thresh': 0.98,
                    'decay': 0.0005,
-                   'pruning_type':'linear',
+                   'pruning_type':'exp.',
+                   'scale': False
                    },
          features=features,
          architecture_type='exp-down',
@@ -55,4 +56,4 @@ def plots():
   # Feature Selection:
   FS.plot.feature_entropy()
   FS.plot.pruning_history()
-  FS.plot.input_reduction('both', highlight = True)
+  FS.plot.input_reduction('both', highlight=True)

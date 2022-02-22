@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
+
+from matplotlib import colors
 from pathlib import Path
 
 from .base import Base
@@ -38,11 +40,11 @@ class LinearTransformationVisualizer(Base):
     self.set_path(Path.cwd() / 'plots' / self.container.name /
                   self.container.timestamp)
 
-    if "PCA" in repr(container):
-      self.component_type = "PC"
+    if 'PCA' in repr(container):
+      self.component_type = 'PC'
 
-    elif "LDA" in repr(container):
-      self.component_type = "LD"
+    elif 'LDA' in repr(container):
+      self.component_type = 'LD'
 
     else:
       raise TypeError("Plot function is not supported for other"
@@ -137,7 +139,6 @@ class LinearTransformationVisualizer(Base):
 
       ax.legend()
 
-
     ax.set_xlabel('component')
     ax.set_xticks(ticks)
     ax.set_xticklabels(ticklabels)
@@ -145,11 +146,26 @@ class LinearTransformationVisualizer(Base):
 
     ax.set_ylim(0, 105)
 
-  def loadings_line(self, component=None):
+  def loadings(self, component, type='bar', FOI=None):
+    if type == 'bar':
+      self._loadings_bar(component)
+    elif type == 'line':
+      self._loadings_line(component)
+    elif type == 'scatter':
+      component_x = component[0]
+      component_y = component[1]
+      self._loadings_scatter(component_x, component_y, FOI)
+
+  def _loadings_line(self, component=None):
     """
     The loadings line plot shows the correlation of the original features with
     the newly generated components (LDs or PCs). The importance of of each
     feature for the container can be extracted out of the line plot.
+
+    component : int, optional
+      The component that shall be plotted. If 'None', all components are
+      plotted. If it is a list of integers, it will plot all lines in one plot.
+      The default is 'None'.
 
     Returns
     -------
@@ -159,7 +175,7 @@ class LinearTransformationVisualizer(Base):
 
     self.container.get_loadings()
 
-    fig = plt.figure("Loadings Lineplot", figsize=(full_width, 4))
+    fig = plt.figure("Loadings lineplot", figsize=(full_width, 4))
     fig.clf()
     ax = fig.add_subplot(111)
 
@@ -169,19 +185,108 @@ class LinearTransformationVisualizer(Base):
       idx = self.components['idx']
 
     for i in idx:
-      ax.plot(self.container.features, self.container.data.loadings[i],
+      ax.plot(self.container.data.features, self.container.data.loadings[i],
               label=self.components['name'][i])
 
     # y-axis:
-    ax.set_ylabel('loading value [-]')
+    ax.set_ylabel('loading [-]')
 
     # x-axis:
     ax.set_xlabel('feature')
     ax.set_xlim(0, self.container.data.n_features-1)
-    ax.set_xticks(self.container.features)
-    ax.set_xticklabels(self.container.features, rotation=-45, ha="left")
+    ax.set_xticks(self.container.data.features)
+    ax.set_xticklabels(self.container.data.features, rotation=-45, ha="left")
 
     ax.legend(loc='upper center', ncol=len(idx))
+
+  def _loadings_bar(self, component=None):
+    """
+    The loadings line plot shows the correlation of the original features with
+    the newly generated components (LDs or PCs). The importance of of each
+    feature for the container can be extracted out of the line plot.
+
+    component : int, optional
+      The component that shall be plotted. If 'None', all components are
+      plotted. If it is a list of integers, it will plot all bar plots in
+      multiple subplots. The default is 'None'.
+
+    Returns
+    -------
+    None.
+
+    """
+
+    self.container.get_loadings()
+
+    if component:
+      components = np.array(component, ndmin=1) - 1
+    else:
+      components = self.components['components']
+
+    n = len(components)
+
+    fig = plt.figure("Loadings barplot", figsize=(full_width, n*3))
+    fig.clf()
+    fig, axs = plt.subplots(n, 1, sharex=True, sharey=True,
+                            num="Loadings barplot", figsize=(full_width, n*3))
+
+    axs = np.array(axs, ndmin=1)
+    for i in components:
+      axs[i].bar(self.container.data.features, self.container.data.loadings[i])
+
+      # y-axis:
+      axs[i].set_ylabel(f"{self.components['name'][i]} loadings [-]")
+
+    # x-axis:
+    axs[-1].set_xlabel('feature')
+    axs[-1].set_xlim(-0.5, self.container.data.n_features-0.5)
+
+    if self.container.data.features.dtype == 'str':
+      axs[-1].set_xticks(self.container.data.features)
+      axs[-1].set_xticklabels(self.container.data.features,
+                              rotation=-45, ha="left")
+
+  def _loadings_scatter(self, component_x=1, component_y=2, FOI=None):
+    """
+    Similarily to the loadings lineplot, the loadings plot is a
+    visualization tool to show how much each variable contributes to the
+    corresponding component (PC or LD).
+
+    Parameters
+    ----------
+    component_x : int, optional
+      Defines the displayed component in x direction. The default is 1.
+    component_y : int, optional
+      Defines the displayed component in y direction. The default is 2.
+    FOI : list, optional
+      Mask that can highlight some relevant points. The default is 'None'.
+
+    Returns
+    -------
+    None.
+
+    """
+    self.container.get_loadings()
+
+    fig = plt.figure("Loadings Plot", figsize=(half_width, half_width))
+    fig.clf()
+    ax = fig.add_subplot(111)
+
+    x, y = component_x - 1, component_y - 1
+
+    limit = np.amax(np.abs(self.container.data.loadings[[x, y]])) * 1.05
+    ax.set_ylim(-limit, limit)
+    ax.set_xlim(-limit, limit)
+
+    ax.scatter(self.container.data.loadings[x],
+               self.container.data.loadings[y])
+
+    self.plot_features_of_interest(FOI=FOI, x=x, y=y)
+
+    ax.set_ylabel(self.components["name"][y])
+    ax.set_xlabel(self.components["name"][x])
+
+    ax.set_aspect('equal')
 
   def contribution_bar(self, component=1, show_average=False):
     """
@@ -193,13 +298,16 @@ class LinearTransformationVisualizer(Base):
     ----------
     component : int, optional
         Defines the displayed component. The default is 1.
+    show_average : bool, optional
+      If True, it shows the average contribution of all features. The default
+      is 'False'.
 
     Returns
     -------
     None.
 
     """
-    fig = plt.figure("Contribution Bar Plot")
+    fig = plt.figure("Contribution Bar Plot", figsize=(half_width, 2))
     fig.clf()
     ax = fig.add_subplot(111)
 
@@ -210,10 +318,14 @@ class LinearTransformationVisualizer(Base):
     height = self.container.data.contribution[component] * 100
     idx = np.flip(np.argsort(height))
     height = height[idx]
-    features = self.container.features[idx]
-    ax.bar(features, height=height)
+    features = self.container.data.features[idx]
+    ax.bar(np.arange(len(features)), height=height)
     ax.set_xticks(range(len(features)))
-    ax.set_xticklabels(features, rotation=-45, ha='left')
+
+    if features.dtype == 'str':
+      ax.set_xticklabels(features, rotation=-45, ha='left')
+    else:
+      ax.set_xticklabels(features, ha='center')
 
     if show_average:
       ax.axhline(np.mean(height), color='k', ls='-.', label='average',
@@ -222,7 +334,8 @@ class LinearTransformationVisualizer(Base):
 
     # y-axis:
     ax.set_ylim(0, height[0] * 1.05)
-    ax.set_ylabel(f"conribution to {self.components['name'][component]} $[\%]$")
+    ax.set_ylabel(f"conribution to {self.components['name'][component]} "
+                  "$[\%]$")
 
     # x-axis:
     ax.set_xlim(-0.5, len(height)-0.5)
@@ -240,7 +353,6 @@ class LinearTransformationVisualizer(Base):
     ----------
     components : list, optional
       Defines the displayed components. The default is [1, 2].
-
     show_average : bool, optional
       If True, it shows the average contribution of all features. The default
       is 'False'.
@@ -266,7 +378,7 @@ class LinearTransformationVisualizer(Base):
 
     idx = np.flip(np.argsort(np.abs(height)))
     height = height[idx] / np.sum(height) * 100
-    features = self.container.features[idx]
+    features = self.container.data.features[idx]
     x = np.arange(self.container.data.n_features)
     ax.bar(x, height=np.abs(height), color='k', alpha=0.25, edgecolor='k',
            label='sum')
@@ -277,10 +389,15 @@ class LinearTransformationVisualizer(Base):
              label=self.components['name'][components[i]], width=width)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(features, rotation=-45, ha='left')
+
+    if features.dtype == 'str':
+      ax.set_xticklabels(features, rotation=-45, ha='left')
+    else:
+      ax.set_xticklabels(features, ha='center')
 
     if show_average:
-      ax.axhline(np.mean(height), color='k', ls='-.', zorder=0)
+      ax.axhline(np.mean(height), color='k', ls='-.', zorder=0,
+                 label='average')
       ax.legend(loc='upper right')
 
     ax.set_ylim(0, height[0] * 1.05)
@@ -309,12 +426,12 @@ class LinearTransformationVisualizer(Base):
 
     """
 
-    if FOI is None:
+    if (FOI is None) or (FOI not in self.container.data.features):
       return
 
     FOI = np.array(FOI, ndmin=1)
 
-    mask = np.argwhere(self.container.features == np.array(FOI))
+    mask = np.argwhere(self.container.data.features == np.array(FOI))
     plt.scatter(self.container.data.loadings[x, mask],
                 self.container.data.loadings[y, mask], color=self.c_cmap(2))
 
@@ -369,50 +486,66 @@ class LinearTransformationVisualizer(Base):
 
     ax.set_aspect('equal')
 
-  def contribution_heatmap(self, idx=None, show_sum=False, weighted=True):
+  def contribution_heatmap(self, component=None,
+                           show_sum=False,
+                           weighted=True):
     """
     The contribution heatmap shows all the loading values of the p components
     (LD or PC) and visualizes their contribution with circles of different
     sizes. The bigger the circle, the more does this feature contribute to the
     corresponding component.
 
+    component : int, optional
+      Defines the components to plot. If 'None', it will plot all components.
+      The default is 'None'.
+    show_sum : bool, optional
+      Defines whether to plot the sum of all contributions. The default is
+      'False'.
+    weighted : bool, optional
+      Defines whether the sum is weighted according their loadings. The default
+      is 'True'.
+
     Returns
     -------
     None.
 
     """
-    fig = plt.figure("Contribution Heatmap", figsize=(half_width, 5))
+    fig = plt.figure("Contribution heatmap", figsize=(half_width, 5))
     fig.clf()
     ax = fig.add_subplot(111)
 
     self.container.get_contribution()
 
     #mapping circles onto heatmap
-    if not idx:
+    if not component:
       n = self.container.params.build.n_components
-      idx = np.arange(n)
+      component = np.arange(n)
 
     else:
-      if isinstance(idx, int):
-          idx = [idx]
+      if isinstance(component, int):
+          component = [component]
 
-      idx = np.array(idx) - 1
-      n = len(idx)
+      component = np.array(component) - 1
+      n = len(component)
 
-    contribution = self.container.data.contribution[idx]
+    contribution = self.container.data.contribution[component]
 
+    # summation of all contributions:
     if show_sum:
       weights = np.ones([n, 1]) / n
+
       if weighted:
-        evals = self.container.data.evals[:, idx]
+        evals = self.container.data.evals[:, component]
         weights = (evals/np.sum(evals)).T
+
       con_sum = np.sum(contribution*weights, axis=0, keepdims=True)
       n += 1 # for additional axis
       contribution = np.concatenate([contribution, con_sum],
                                     axis = 0)
-    con_max = np.amax(contribution)
-    con_min = np.amin(contribution)
 
+    con_max = np.amax(contribution)
+
+    # plot of contributions:
     for i in range(self.container.data.n_features):
       for j in range(n):
         con = contribution[j, i]
@@ -421,24 +554,31 @@ class LinearTransformationVisualizer(Base):
                             color=self.im_cmap(con/con_max))
         ax.add_patch(circle)
 
-    #setup plot axes
+    # x-axis:
     ax.set_xticks(np.arange(n))
-    xticks = list(np.array(self.components['name'])[idx])
+    xticks = list(np.array(self.components['name'])[component])
+
     if show_sum:
       if weighted:
         xticks.append('$\Sigma_w$')
+
       else:
         xticks.append('$\Sigma$')
+
     ax.set_xticklabels(xticks)
-    ax.set_yticks(np.arange(self.container.data.n_features))
-    ax.set_yticklabels(self.container.features)
     ax.set_xlim(-0.5, n - 0.5)
-    ax.set_ylim(-0.5, len(self.container.features) - 0.5)
+
+    # y-axis:
+    ax.set_yticks(np.arange(self.container.data.n_features))
+    ax.set_yticklabels(self.container.data.features)
+    ax.set_ylim(-0.5, len(self.container.data.features) - 0.5)
+
     ax.set_aspect("equal")
+
     ax.grid(False)
 
     #rastering
-    for i in range(len(self.container.features)):
+    for i in range(len(self.container.data.features)):
         ax.axhline(i + 0.5, color="k", lw=0.5)
     for i in range(n):
         ax.axvline(i + 0.5, color="k", lw=0.5)
@@ -451,46 +591,6 @@ class LinearTransformationVisualizer(Base):
     ticks = np.round(np.linspace(0, con_max*100, 5), 1)
     cbar = ax.figure.colorbar(sm, ticks=ticks)
     cbar.ax.set_ylabel("contribution [$\%$]")
-
-  def loadings(self, component_x=1, component_y=2, FOI=None):
-    """
-    Similarily to the loadings lineplot, the loadings plot is a
-    visualization tool to show how much each variable contributes to the
-    corresponding component (PC or LD).
-
-    Parameters
-    ----------
-    component_x : int, optional
-      Defines the displayed component in x direction. The default is 1.
-    component_y : int, optional
-      Defines the displayed component in y direction. The default is 2.
-    FOI : list, optional
-      Mask that can highlight some relevant points. The default is 'None'.
-
-    Returns
-    -------
-    None.
-
-    """
-    self.container.get_loadings()
-
-    fig = plt.figure("Loadings Plot", figsize=(half_width, half_width))
-    fig.clf()
-    ax = fig.add_subplot(111)
-
-    x, y = component_x - 1, component_y - 1
-
-    ax.scatter(self.container.data.loadings[x],
-               self.container.data.loadings[y])
-
-    self.plot_features_of_interest(FOI=FOI, x=x, y=y)
-
-    ax.set_ylabel(self.components["name"][y])
-    ax.set_xlabel(self.components["name"][x])
-
-    ax.set_aspect('equal', 'datalim')
-
-    return ax
 
   # implement 3rd component for 3d plot:
   def scores(self, component_x=1, component_y=2,
@@ -506,10 +606,20 @@ class LinearTransformationVisualizer(Base):
 
     Parameters
     ----------
-    x : int, optional
+    component_x : int, optional
       Defines the displayed component in x direction. The default is 1.
-    y : int, optional
+    component_y : int, optional
       Defines the displayed component in y direction. The default is 2.
+    projection : bool, optional
+      Defines whether a projection of the scores onto the x- and y-axis is
+      plotted. It requires the definition of the axes in the list specified
+      in 'projection_axes'. The default is 'False'.
+    decision_boundaries : bool, optional
+      Defines whether the decision boundaries for LDAs is plotted or not. The
+      default is 'False'.
+    confidence_interval : int, optional
+      Sets the value for a confidence interval around the center of center of
+      data. If 'None', it will not plot the interval. The default is 'None'.
 
     Returns
     -------
@@ -523,57 +633,45 @@ class LinearTransformationVisualizer(Base):
 
     if projection:
       gs = gridspec.GridSpec(2, 2, figure=fig,
-                             width_ratios = (5,1),
-                             height_ratios = (1,5))
+                             width_ratios=(5,1),
+                             height_ratios=(1,5))
 
       ax = fig.add_subplot(gs[1,0])
-      ax.set_aspect('equal')
-
-      ax1 = fig.add_subplot(gs[1,1], sharey=ax)
-      ax1.tick_params(labelleft=False, labelbottom=False)
-      # ax1.axis('off')
 
       ax2 = fig.add_subplot(gs[0,0], sharex=ax)
       ax2.tick_params(labelleft=False, labelbottom=False)
-      # ax2.axis('off')
+      ax2.axis('off')
 
-      ax3 = fig.add_subplot(gs[0,1], sharex=ax1, sharey=ax2)
-      # ax3.axis('off')
+      ax1 = fig.add_subplot(gs[1,1], sharey=ax)
+      ax1.tick_params(labelleft=False, labelbottom=False)
+      ax1.axis('off')
+
+      ax3 = fig.add_subplot(gs[0,1])
+      ax3.tick_params(labelleft=False, labelbottom=False)
+      ax3.axis('off')
 
     else:
       ax = fig.add_subplot(111)
 
     if self.component_type == 'PC':
-      if projection:
-        self.scores_pca(ax, component_x, component_y,
-                        projection=projection,
-                        projection_axes=[ax1, ax2],
-                        confidence_interval=confidence_interval)
-        ax1.set_ylim(ax.get_ylim())
-        ax2.set_xlim(ax.get_xlim())
-      else:
-        self.scores_pca(ax, component_x, component_y,
-                        confidence_interval=confidence_interval)
+      self.scores_pca(ax, component_x, component_y,
+                      projection=projection,
+                      projection_axes=[ax1, ax2],
+                      confidence_interval=confidence_interval)
 
     elif self.component_type == 'LD':
-      if projection:
-        self.scores_lda(ax, component_x, component_y,
-                        projection=projection,
-                        projection_axes=[ax1, ax2],
-                        decision_boundaries=decision_boundaries,
-                        confidence_interval=confidence_interval)
-      else:
-        self.scores_lda(ax, component_x, component_y,
-                        projection=projection,
-                        decision_boundaries=decision_boundaries,
-                        confidence_interval=confidence_interval)
+      self.scores_lda(ax, component_x, component_y,
+                      projection=projection,
+                      projection_axes=[ax1, ax2],
+                      decision_boundaries=decision_boundaries,
+                      confidence_interval=confidence_interval)
 
     ax.set_xlabel(self.components['name'][component_x - 1])
     ax.set_ylabel(self.components['name'][component_y - 1])
 
   def scores_pca(self, ax, component_x=1, component_y=2,
-                  projection=False, projection_axes=[None, None],
-                  confidence_interval=3):
+                 projection=False, projection_axes=[None, None],
+                 confidence_interval=None):
       """
       The scores plot shows the samples in the new latent feature space
       defined by the given components.
@@ -584,20 +682,33 @@ class LinearTransformationVisualizer(Base):
       Parameters
       ----------
       ax : axis
-          Defines the current axis of the inserted plot.
+        Defines the current axis of the inserted plot.
       component_x : int, optional
-          Defines the displayed component in x direction. The default is 1.
+        Defines the displayed component in x direction. The default is 1.
       component_y : int, optional
-          Defines the displayed component in y direction. The default is 2.
+        Defines the displayed component in y direction. The default is 2.
+      projection : bool, optional
+        Defines whether a projection of the scores onto the x- and y-axis is
+        plotted. It requires the definition of the axes in the list specified
+        in 'projection_axes'. The default is 'False'.
+      projection_axes : list, optional
+        Defines the axes objects, where the projection is plotted onto. The
+        default is '[None, None]'.
+      confidence_interval : int, optional
+        Sets the value for a confidence interval around the center of center of
+        data. If 'None', it will not plot the interval. The default is 'None'.
 
       Returns
       -------
-      ax : axis
-        The axis with the scatter plot.
+      None.
 
       """
       x, y = component_x - 1, component_y - 1
-      limit = np.amax(np.abs(self.container.data.scores[:, [x, y]])) * 1.0
+
+      limit = np.amax(np.abs(self.container.data.scores[:, [x, y]])) * 1.05
+
+      ax.set_ylim(-limit, limit)
+      ax.set_xlim(-limit, limit)
 
       if self.container.y is not None:
         for i, c in enumerate(self.container.data.classes):
@@ -611,20 +722,25 @@ class LinearTransformationVisualizer(Base):
           if confidence_interval:
             confidence(ax, cov, mu, s=confidence_interval)
 
-          ax.scatter(scores[:, 0], scores[:, 1], alpha=0.7, color=color,
-                     label=c)
+          ax.scatter(scores[:, 0], scores[:, 1],
+                      alpha=0.7, color=color, label=c)
 
-          ax.scatter(mu[0], mu[1], marker="X", color=color, edgecolors="k")
+          ax.scatter(mu[0], mu[1], marker='X', color=color, edgecolors="k")
 
-          # projection of scatter plot onto x- and y-axis
+          # projection of scatter plot onto x- and y-axis:
           if projection:
+
             X = np.linspace(-limit, limit, 100)
+
             exp_0 = np.exp(-(X - mu[0])**2 / (2 * cov[0, 0]))
             exp_1 = np.exp(-(X - mu[1])**2 / (2 * cov[1, 1]))
+
             scale_0 = 1 / np.sqrt(2 * np.pi * cov[0, 0])
             scale_1 = 1 / np.sqrt(2 * np.pi * cov[1, 1])
+
             projection_0 = scale_0 * exp_0
             projection_1 = scale_1 * exp_1
+
             projection_axes[1].plot(X, projection_0)
             projection_axes[0].plot(projection_1, X)
 
@@ -633,16 +749,11 @@ class LinearTransformationVisualizer(Base):
                    self.container.data.scores[:, y],
                    alpha=0.7)
 
-      ax.set_ylim(-limit, limit)
-      ax.set_xlim(-limit, limit)
-
-      return ax
-
-  def scores_lda(self, ax, x = 1, y = 2,
-                  projection = False,
-                  projection_axes = [None, None],
-                  decision_boundaries = False,
-                  confidence_interval = 3):
+  def scores_lda(self, ax, component_x=1, component_y=2,
+                  projection=False,
+                  projection_axes=[None, None],
+                  decision_boundaries=False,
+                  confidence_interval=3):
     """
     The scores plot shows the samples in the new latent feature space defined
     by the given components.
@@ -664,60 +775,84 @@ class LinearTransformationVisualizer(Base):
     None.
 
     """
-    limit = np.amax(np.abs(self.container.scores[:, [x, y]]))
-    for i in range(self.container.n_classes):
-      scores = self.container.log[f"{self.container.classes[0][i]}"]["scores"].T[[x, y]]
-      cov = self.container.data.covariance_matrix(scores)
-      mu = (self.container.loadings[[x, y]] @ self.container.log[f"{self.container.classes[0][i]}"]["mu"]).T.squeeze()
+    x, y = component_x - 1, component_y - 1
+
+    limit = np.amax(np.abs(self.container.data.scores[:, [x, y]])) * 1.05
+
+    ax.set_ylim(-limit, limit)
+    ax.set_xlim(-limit, limit)
+
+    colors_l = []
+
+    for i, c in enumerate(self.container.data.classes):
+      mask = np.argwhere(self.container.y == c).flatten()
+      scores = self.container.data.scores[mask][:,np.array([x, y])]
+
+      color = self.c_cmap(i * 4)
+      colors_l.append(color)
+      cov = np.cov(scores.T)
+      mu = np.average(scores, axis=0)
 
       if confidence_interval:
-        confidence(ax, cov, mu, s = confidence_interval)
+        confidence(ax, cov, mu, s=confidence_interval)
 
-      ax.scatter(scores[0], scores[1], alpha = 0.7, edgecolors = "k",
-                 label = f"{self.container.classes[0][i]}")
-      ax.scatter(mu[0], mu[1], marker = "X", edgecolors = "k")
-      #projection of scatter plot onto x- and y-axis
+      ax.scatter(scores[:, 0], scores[:, 1],
+                 alpha=0.7, color=color, label=c)
+
+      ax.scatter(mu[0], mu[1], marker='X', color=color, edgecolors="k")
+
+      # projection of scatter plot onto x- and y-axis:
       if projection:
-        X = np.linspace(- limit, limit, 100)
-        projection_0 = 1 / np.sqrt(2 * np.pi * cov[0, 0]) * np.exp(-(X - mu[0])**2 / (2 * cov[0, 0]))
-        projection_1 = 1 / np.sqrt(2 * np.pi * cov[1, 1]) * np.exp(-(X - mu[1])**2 / (2 * cov[1, 1]))
-        projection_axes[1].plot(X, -projection_0)
-        projection_axes[0].plot(-projection_1, X)
-    ax.legend(loc = "upper right")
+
+        X = np.linspace(-limit, limit, 100)
+
+        exp_0 = np.exp(-(X - mu[0])**2 / (2 * cov[0, 0]))
+        exp_1 = np.exp(-(X - mu[1])**2 / (2 * cov[1, 1]))
+
+        scale_0 = 1 / np.sqrt(2 * np.pi * cov[0, 0])
+        scale_1 = 1 / np.sqrt(2 * np.pi * cov[1, 1])
+
+        projection_0 = scale_0 * exp_0
+        projection_1 = scale_1 * exp_1
+
+        projection_axes[1].plot(X, projection_0)
+        projection_axes[0].plot(projection_1, X)
 
     # get decision boundary and confidence levels
     if decision_boundaries:
+      cmap = colors.ListedColormap(colors_l)
       sampling = 100
       x_decision = np.linspace(ax.get_xlim()[0], ax.get_xlim()[1], sampling)
       y_decision = np.linspace(ax.get_ylim()[0], ax.get_ylim()[1], sampling)
 
       delta = np.zeros([sampling, sampling])
       conf = np.zeros([sampling, sampling])
+
       for i, X in enumerate(x_decision):
         for j, Y in enumerate(y_decision):
-          d = self.container.decision_rule(np.array([[X, Y]]).T,
-                                          components = [x, y],
-                                          transformed = True)
-          conf[j, i] = np.diff(d[np.argsort(d)[-2:]])
-          delta[j, i] = self.container.classes[1, np.argmax(np.array(d))]
+          d = self.container.decision_rule(np.array([X, Y], ndmin=2),
+                                           components=[x, y],
+                                           transformed=True)
+          conf[j, i] = np.diff(d[:, np.argsort(d)[0,-2:]])
+          delta[j, i] = self.container.data.classes[np.argmax(np.array(d))]
 
       conf = (conf - np.amin(conf)) / (np.amax(conf) - np.amin(conf))
 
-      ax.imshow(delta, extent = [x_decision[0], x_decision[-1],
-                                  y_decision[0], y_decision[-1]],
-                cmap = self.c_cmap, zorder = -2, origin = "lower",
-                alpha = conf, interpolation = "hamming")
+      ax.imshow(delta, extent=[x_decision[0], x_decision[-1],
+                               y_decision[0], y_decision[-1]],
+                cmap=cmap, zorder=-2, origin='lower',
+                alpha=conf, interpolation='hamming')
 
-
-  def biplot(self, component_x=1, component_y=2, loading_scale=1, FOI=None):
+  def biplot(self, FOI, component_x=1, component_y=2, loading_scale=1, ):
     """
     A powerful plot technique that shows the scores plot as well as the
-    loading plot of the features of interest (FOIs) for the given
-    components. The loading plot is scaled differently than the scores
-    plot.
+    loading plot of the features of interest (FOIs) for the given components.
+    The loading plot is scaled differently than the scores plot.
 
     Parameters
     ----------
+    FOI : list
+      Mask that can highlight some relevant FOInts.
     component_x : int, optional
       Defines the displayed component in x direction. The default is 1.
     component_y : int, optional
@@ -726,8 +861,6 @@ class LinearTransformationVisualizer(Base):
       Scaling factor for the loading scale. The default is 1 and scales the
       loading axes such that the absolute loading maximum is as big as the
       absolute score maximum.
-    FOI : list, optional
-      Mask that can highlight some relevant FOInts. The default is 'None'.
 
     Returns
     -------
@@ -736,24 +869,23 @@ class LinearTransformationVisualizer(Base):
     """
     self.container.get_scores()
 
-    fig = plt.figure('Biplot', figsize=(half_width, half_width))
+    x, y = component_x - 1, component_y - 1
+    limit = np.amax(np.abs(self.container.data.scores[:, [x, y]])) * 1.05
+
+    fig = plt.figure('Biplot', figsize=(half_width, 3.1))
     fig.clf()
     ax = fig.add_subplot(111)
 
-    x, y = component_x - 1, component_y - 1
+    # plot scores:
+    if self.component_type == 'PC':
+      self.scores_pca(ax, component_x, component_y)
+    elif self.component_type == 'LD':
+      self.scores_lda(ax, component_x, component_y)
 
-    #plot scale
-
-    if self.component_type == "PC":
-      ax = self.scores_pca(ax, x, y)
-    elif self.component_type == "LD":
-      ax = self.scores_lda(ax, x, y)
-
-    #scaling loadings on same scale as scores
-    scale = (np.amax([np.abs(np.amin(self.container.data.scores)),
-                      np.amax(self.container.data.scores)])
-              / np.amax([np.abs(np.amin(self.container.data.loadings)),
-                        np.amax(self.container.data.loadings)]))
+    # plot loadings as arrows:
+    # scaling loadings on same scale as scores
+    scale = (np.amax(np.abs(self.container.data.scores))
+             / np.amax(np.abs(self.container.data.loadings)))
     scale = scale * loading_scale
 
     def scaling_down(x, scale = scale):
@@ -762,57 +894,61 @@ class LinearTransformationVisualizer(Base):
     def scaling_up(x, scale = scale):
       return x / scale
 
-    ax1 = ax.secondary_xaxis("top", functions=(scaling_up, scaling_down))
-    ax2 = ax.secondary_yaxis("right", functions=(scaling_up, scaling_down))
+    ax1 = ax.secondary_xaxis('top', functions=(scaling_up, scaling_down))
+    ax2 = ax.secondary_yaxis('right', functions=(scaling_up, scaling_down))
 
     if FOI:
       FOI = np.array(FOI, ndmin=1)
 
       for P in FOI:
-        idx = np.argwhere(self.container.features == np.array(P))
-        ax.annotate(P, xy = (0, 0),
-                    xytext = (self.container.data.loadings[x, idx] * scale,
-                              self.container.data.loadings[y, idx] * scale),
-                    va = "center", ha = "center", color = "k",
-                    arrowprops = dict(arrowstyle="<|-", shrinkA=0,
-                                      shrinkB=0, color = "k"))
+        if not P in self.container.data.features:
+          continue
+        idx = np.argwhere(self.container.data.features == np.array(P))
+
+        if self.container.data.loadings[x, idx] > 0:
+          ha = 'left'
+        else:
+          ha = 'right'
+
+        if self.container.data.loadings[y, idx] > 0:
+          va = 'bottom'
+        else:
+          va = 'top'
+
+        ax.annotate(P, xy=(0, 0),
+                    xytext=(self.container.data.loadings[x, idx] * scale,
+                            self.container.data.loadings[y, idx] * scale),
+                    va=va, ha=ha, color='k',
+                    arrowprops=dict(arrowstyle='<|-', shrinkA=0,
+                                    shrinkB=0, color='k'))
 
     # x-axis:
-    ax.set_xlabel(f"score values {self.components['name'][x]}")
-    ax1.set_xlabel(f"loading values {self.components['name'][x]}")
+    ax.set_xlabel(f"score {self.components['name'][x]}")
+    ax1.set_xlabel(f"loading {self.components['name'][x]}")
+    ax.set_xlim(-limit, limit)
 
     # y-axis:
-    ax.set_ylabel(f"score values {self.components['name'][y]}")
-    ax2.set_ylabel(f"loading values {self.components['name'][y]}")
+    ax.set_ylabel(f"score {self.components['name'][y]}")
+    ax2.set_ylabel(f"loading {self.components['name'][y]}")
+    ax.set_ylim(-limit, limit)
 
-    ax.set_aspect('equal', 'datalim')
+    ax.set_aspect('equal')
 
     if self.component_type == "LD":
       ax.legend(loc='upper right')
 
 
-  # def multiplot(self, visualization_type = "scores", n_components = None, label = None, FOInts_of_interest = None, n_features = None):
-  #     if n_components == None:
-  #         n_components = self.container.n_components
-  #     figure_title = f"Multiplot of PCA {visualization_type}"
-  #     fig, axs = plt.subplots(n_components - 1, n_components - 1)
-  #     fig.canvas.set_window_title(figure_title)
-  #     x, y = 1, 2
-  #     while True:
-  #         plt.sca(axs[x - 1, y - 2])
-  #         if x >= y:
-  #             fig.delaxes(axs[x - 1, y - 2])
-  #         else:
-  #             if visualization_type == "scores":
-  #                 self.container.scores_plot(x, y, label = label, legend = False)
-  #                 if y == n_components and x == 1:
-  #                     plt.legend(bbox_to_anchor = (1.05, 1.05), loc = "upper right")
-  #             elif visualization_type == "loadings":
-  #                 self.container.loadings_plot(x, y, n_features = n_features)
-  #         y += 1
-  #         if y > n_components:
-  #             y = 2
-  #             x += 1
-  #         if x >= n_components:
-  #             break
-  #     plt.tight_layout(0.5)
+  # still to be investigated:
+  def decode(self):
+    if self._reduced == False:
+        self.get_reduced_X()
+
+    n_pixels = self.n_samples * self.n_features
+    reduction = np.round((1 - (self.scores.size + self.evecs[:self.n_components].size) / n_pixels) * 100, 2)
+    mse = np.sum((self.reduced_X - self.preprocessed_X)**2) / n_pixels
+    psnr = -np.log10(mse / (np.amax(self.preprocessed_X) + np.abs(np.amin(self.preprocessed_X)))**2)
+    fig, axs = plt.subplots(2,1)
+    axs[0].imshow(self.X.T)
+    axs[0].title.set_text("Original")
+    axs[1].imshow(self.reduced_X.T)
+    axs[1].title.set_text(f"Reduction: {reduction} \%; PSNR: {psnr:0.2f} dB")

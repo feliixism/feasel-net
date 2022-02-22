@@ -478,14 +478,14 @@ class FeatureSelection(Callback):
         Indices of the most important weights.
 
     """
-    # CONVENIENCE FACTOR: not used
-    # the convenience factor is an adaptive factor that shall encourage
-    # the feature selection callback to trigger after the second stage
-    # pruning trigger is not pulled in the first few attempts
-    if self.trigger.d >= self.feasel_params.d_min:
-        convenience_factor = self.feasel_params.d_min / self.trigger.d
-    else:
-        convenience_factor = 1.0
+    # # CONVENIENCE FACTOR: not used
+    # # the convenience factor is an adaptive factor that shall encourage
+    # # the feature selection callback to trigger after the second stage
+    # # pruning trigger is not pulled in the first few attempts
+    # if self.trigger.d >= self.feasel_params.d_min:
+    #     convenience_factor = self.feasel_params.d_min / self.trigger.d
+    # else:
+    #     convenience_factor = 1.0
 
     if n_features == self.log.n_features[-1]:
       mask = self.log.mask_k[-1]
@@ -494,43 +494,14 @@ class FeatureSelection(Callback):
     # biggest increase of the entropy and are thus more important
     elif self.feasel_params.loocv:
       prune_index = np.argsort(H_features)[:-n_features]
-      # prune = H_features[prune_index]
-      keep_index = np.argsort(H_features)[-n_features:]
-      # keep = H_features[keep_index]
-
-      # prune_min, prune_max = np.amin(prune), np.amax(prune)
-      # keep_min, keep_max = np.amin(keep), np.amax(keep)
-
-      # # the difference between kept and pruned features shall be at
-      # # least 10 % of the maximum loss value
-      # # if (keep_min - prune_max) >= (self.feasel_params.d_loss_ratio
-      # #                               * convenience_factor
-      # #                               * (keep_max - prune_min)):
-      # # index = self.log.index_k[-1][keep_index]
       mask = np.array(self.log.mask_k[0])
       mask[prune_index] = False
-      # else:
-      #   index = self.log.index_k[-1]
 
     # lowest H_features shall endure
     else:
       prune_index = np.argsort(H_features)[n_features:]
-      # prune = H_features[prune_index]
-      keep_index = np.argsort(H_features)[:n_features]
-      # keep = H_features[keep_index]
-
-      # prune_min, prune_max = np.amin(prune), np.amax(prune)
-      # keep_min, keep_max = np.amin(keep), np.amax(keep)
-      # # the difference between kept and pruned features shall be at
-      # # least 10 % of the minimum loss value
-      # # if (keep_max - prune_min) <= (self.feasel_params.d_loss_ratio
-      # #                               * convenience_factor
-      # #                               * (keep_min - prune_max)):
-      # # index = self.log.index_k[-1][keep_index]
       mask = np.array(self.log.mask_k[0])
       mask[prune_index] = False
-      # else:
-      #   index = self.log.index_k[-1]
 
     return mask
 
@@ -554,7 +525,7 @@ class FeatureSelection(Callback):
     loss = self.feasel_params._calculate_loss(P, Q)
     return loss
 
-  def _get_information_richness(self, metric='mean', scale=True):
+  def _get_information_richness(self, metric):
     """
     We use the cross-entropy H that measures uncertainty of possible outcomes
     and is the best suited loss metric for multiclass classification tasks.
@@ -568,10 +539,7 @@ class FeatureSelection(Callback):
     metric : str, optional
       The type of metric to combine all individual loss values to one
       meaningful and comparable value for each feature. Possible options are
-      'median' or 'mean'. The default is 'mean'.
-    scale : bool, optional
-      If True, the feature losses are scaled that they fit in between 0 and 1.
-      The default is True.
+      'median' or 'average'.
 
     Returns
     -------
@@ -605,13 +573,20 @@ class FeatureSelection(Callback):
     # splits cross-entropy array into feature batches f:
     H_f_s = np.array(np.array_split(H_s, n_f))
 
-    # # loss values severly depend on samples --> scaling features:
-    if scale:
-      H_f_s = prep.min_max(H_f_s, axis=0)
+    # loss values severly depend on samples --> scaling features:
+    if self.feasel_params.scale:
+      if self.feasel_params.eval_normalization == 'min_max':
+        H_f_s = prep.min_max(H_f_s, axis=0)
+      elif self.feasel_params.eval_normalization == 'standardize':
+        H_f_s = prep.standardize(H_f_s, axis=0)
 
     # log the loss values for each feature and sample:
     if self.log.loss_f:
-      H_f_s_ = np.array(self.log.loss_f[-1])
+      H_f_s_ = self.log.loss_f[-1]
+
+      if self.feasel_params.rationalize:
+        H_f_s_ = self._rationalize_loss(H_f_s_)
+
       H_f_s_[self.log.mask_k[-1]] = H_f_s
       H_f_s = H_f_s_
       self.log.loss_f.append(H_f_s)
@@ -621,13 +596,43 @@ class FeatureSelection(Callback):
       self.log.loss_f = [H_f_s]
       self.log.loss_o = [H_o]
 
-    # calculates mean of all entropies as loss
-    METRIC = {'mean': np.mean,
+    # applies decsion metric of all entropies as loss
+    METRIC = {'average': np.mean,
               'median': np.median}
 
     H_f = METRIC[metric](H_f_s, axis = 1)
 
     return H_f
+
+  def _rationalize_loss(self, H_f_s_):
+    """
+    Puts the metric values in relation to the previous feature loss evaluation.
+
+    Parameters
+    ----------
+    H_f_s_ : ndarray
+      Unrelated previous loss values.
+
+    Returns
+    -------
+    H_f_s_ : ndarray
+      Related previous loss values.
+
+    """
+    previous_loss = self.trigger.value_l[int(self.log.pruning_epochs[-1])]
+    current_loss = self.trigger.value_l[-1]
+
+    if 'acc' in self.feasel_params.eval_type:
+      # penalizes if current accuracy is lower:
+      scale = (previous_loss / current_loss)
+
+    elif 'loss' in self.feasel_params.eval_type:
+      # penalizes if current loss is higher:
+      scale = (current_loss / previous_loss)
+
+    H_f_s_ = np.array(H_f_s_) * scale
+
+    return H_f_s_
 
   def _prune_weights(self, epoch):
     """
@@ -650,7 +655,8 @@ class FeatureSelection(Callback):
 
     """
     # calculate the amount of features after the pruning iteration
-    H_features = self._get_information_richness()
+    metric = self.feasel_params.decision_metric
+    H_features = self._get_information_richness(metric)
     n_features = self._get_n_features()
 
     # get indices that shall be kept

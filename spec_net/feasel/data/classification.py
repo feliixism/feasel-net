@@ -47,6 +47,7 @@ class DataContainer:
 
     """
     self.X = X
+
     if y is not None:
       self.y = np.array(y, ndmin=1)
       self.classes = np.unique(y)
@@ -171,6 +172,7 @@ class DataContainer:
     X = np.array(X, ndmin=2)
 
     if y is not None:
+      y = np.array(y, ndmin=1)
       # take number of samples and the feature shape from the sample axis:
       if self.params.sample_axis:
         self.n_samples = X.shape[sample_axis]
@@ -181,8 +183,9 @@ class DataContainer:
         self.n_samples = X.shape[0]
         feature_shape = X.shape[1:]
 
-      #check whether sample axis is chosen right by comparing number of
-      #samples in y and in given axis
+      # check whether sample axis is chosen right by comparing number of
+      # samples in y and in given axis
+
       if self.n_samples != len(y):
         raise ValueError("Number of samples given in 'sample_axis' "
                          f"({self.n_samples}) does not match with samples in "

@@ -137,7 +137,7 @@ class FeaselDNN(DenseDNN):
     """
     if not self.params.callback.n_features:
       n_features = int(self.data.feature_shape.size
-                    * self.params.callback.compression_rate)
+                       * self.params.callback.compression_rate)
 
     else:
       n_features = self.params.callback.n_features

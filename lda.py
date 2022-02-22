@@ -1,29 +1,32 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from spec_net.analysis import pca, lda
+from spec_net.linear_transformation import LDA
 import sklearn.datasets as datasets
-from spec_net.preprocess import dataformat as df
 
 wine = datasets.load_wine()
 
 location = "U:/privat/Promotion_GewebedifferenzierungmittelsIR-Spektroskopie/D_Dataset/Wine/"
 
-data = wine.data
-labels = wine.target
-attributes = wine.feature_names
-attributes[7] = "nonflav_phenols"
-attributes[11] = "OD280/OD315"
+X = wine.data
+y = wine.target
+features = np.array(wine.feature_names)
 
-X = df.standardize(data)
-y = labels.reshape([len(labels), 1])
+LD = LDA(X, y, features=features,
+         n_components=10,
+         normalization='standardize',
+         solver ='eigs')
 
-ld = lda.LDA(data, y = labels, features = attributes, n_components = 2, rowvar = False, standardize = True)
+def plot():
+  LD.plot.loadings([1,2], type='bar')
+  LD.plot.loadings([1,2], type='line')
+  LD.plot.loadings([1,2], type='scatter')
+  LD.plot.scree('both', show_average=True)
+  LD.plot.scores(1, 2, projection=True, decision_boundaries=True)
+  LD.plot.biplot('alcohol')
+  LD.plot.contribution_bar(2, True)
+  LD.plot.contribution_circle()
+  LD.plot.contribution_heatmap(show_sum=True)
+  LD.plot.contribution_bars(components=[1,2], show_average=True)
 
-ld.plot.scree("both", show_average = True)
-ld.plot.loadings_line()
-ld.plot.loadings(FOI = ["proline"])
-ld.plot.scores(decision_boundaries=True)
-ld.plot.biplot()
-ld.plot.contribution_bar(True)
-ld.plot.contribution_circle()
-ld.plot.contribution_heatmap()
+pred = LD.predict(X)
+decode = LD.decode(X) # decode doesn't really decode right
+LD.data._feature_scale

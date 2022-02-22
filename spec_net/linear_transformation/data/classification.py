@@ -1,20 +1,20 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-from ..parameters import DataParams
-from . import preprocess as pre
+from ..parameters import BuildParams, DataParams
+from . import preprocess as prep
 
 class DataContainer:
-  def __init__(self, X, y=None, features = None, **kwargs):
+  def __init__(self, X, y=None, features=None, **kwargs):
     """
-    This is a data object for the classification with neural networks based on
-    the tensorflow and keras frameworks. Within this class all necessary
-    pre-processing and data-handling tasks can be undertaken.
+    This is a data object for the regression with the principal component
+    analysis (PCA). Within this class all necessary pre-processing and
+    data-handling tasks can be undertaken.
 
     Parameters
     ----------
     X : ndarray
-      Input array for the training of neural networks.
+      Input array for the fitting of the analysis.
     y : ndarray, optional
       Target array for the loss estimation if provided. The default is None.
     features : ndarray, optional
@@ -24,22 +24,17 @@ class DataContainer:
     **kwargs : dict
       All keywords that are allowed in the DataParams class. Those are:
 
-        sample_axis : int, optional
-          Defines the sample axis. If None, the algorithm tries to find the
-          sample axis on its own. The default is None.
-        input_layer : str, optional
-          Defines the shape of the input layer and thus the shape of the input
-          data. The possible types are given by the official Keras layer names.
-          The default is None.
-        normalization : str, optional
-          Defines the normalization type. Possible arguments are 'standardize'
-          and 'min_max'. The default is None.
+      sample_axis : int, optional
+        Defines the sample axis. If None, the algorithm tries to find the
+        sample axis on its own. The default is None.
+      normalization : str, optional
+        Defines the normalization type. Possible arguments are 'standardize'
+        and 'min_max'. The default is None.
 
     Raises
     ------
     ValueError
-      Number of samples given in 'sample_axis' does not match with samples in
-      given in 'y'. Please change your sample axis.
+      If invalid parameter key.
 
     Returns
     -------
@@ -47,13 +42,13 @@ class DataContainer:
 
     """
     self.X = X
+
     if y is not None:
       self.y = np.array(y, ndmin=1)
       self.classes = np.unique(y)
       self.n_classes = len(self.classes)
-
     else:
-      self.y = y
+      self.y = None
       self.classes = None
       self.n_classes = None
 
@@ -64,11 +59,27 @@ class DataContainer:
 
     # class variables for the pre-processing of the data:
     # values will be stored in them during training
-    self._label_encoding_map = None
     self._feature_scale = None
+    self.mu = None
 
-    #params container
-    self.params = DataParams()
+
+    self.class_props = {'n': [],
+                        'mu': [],
+                        'sigma': [],
+                        'prior': [],
+                        'scatter': [],
+                        'covariance': []}
+
+    self.evals = None
+    self.evecs = None
+    self.loadings = None
+    self.scores = None
+    self.score_variance = None
+    self.oev = None
+    self.cev = None
+    self.contribution = None
+
+    self.params = DataParams(**kwargs)
 
     for key in kwargs:
       if key in self.params.__dict__.keys():
@@ -77,8 +88,6 @@ class DataContainer:
         raise KeyError(f"'{key}' is not a valid key for the generic neural "
                        "network useage.")
 
-    self._params = {"data": self.params}
-
     self.X_train, self.y_train = self.prepare(self.X, self.y)
     self.X_test, self.y_test = None, None
 
@@ -86,15 +95,6 @@ class DataContainer:
       return (f"Data(Size of Dataset: {self.X.shape}, "
               f"Number of Samples: {self.n_samples}, "
               f"Number of Classes: {self.n_classes})")
-
-  def get_params(self, type = None):
-      if type is None:
-          return self._params
-      else:
-          try:
-              return self._params[f"{type}"]
-          except:
-              raise NameError(f"'{type}' is an invalid argument for 'type'.")
 
   # DATA PREPARATION:
   def prepare(self, X, y=None):
@@ -124,12 +124,12 @@ class DataContainer:
 
     """
 
-    self.feature_shape = self.assort(X, y, self.params.sample_axis)
-    shape = (self.n_samples, ) + self.feature_shape
+    X = self.assort(X, y, self.params.sample_axis)
 
-    # reshapes the input array to match the target data in terms of samples
-    # axis and features
-    X = X.reshape(shape)
+    if isinstance(self.features, type(None)):
+      self.features = np.arange(self.n_features).reshape(self.feature_shape)
+
+    self.sample_axis = 0 # resetted after reshape
 
     # normalization:
     X = self.normalize(X, self.params.normalization)
@@ -158,73 +158,71 @@ class DataContainer:
 
     Returns
     -------
-    feature_shape : tuple
-      The shape of the features of the input array.
+    X : ndarray
+      The re-ordered array.
 
     """
 
     X = np.array(X, ndmin=2)
+    dims = X.shape
 
-    if y is not None:
-      # take number of samples and the feature shape from the sample axis:
-      if self.params.sample_axis:
-        self.n_samples = X.shape[sample_axis]
-        feature_shape = np.take(X, 0, axis=sample_axis).shape
+    sample_axis = self._get_sample_axis(X, y, sample_axis)
 
-      # take number of samples and the feature shape from the first axis:
-      else:
-        self.n_samples = X.shape[0]
-        feature_shape = X.shape[1:]
+    if sample_axis:
+      # set n_samples and feature_shape:
+      self.n_samples = dims[sample_axis]
+      self.feature_shape = np.take(X, 0, axis=sample_axis).shape
 
-    # compare number of samples in target with the X array and take the axis
-    # that matches the number of samples:
+      X = np.moveaxis(X, sample_axis, 0) # re-order dims
+
+    # take number of samples and the feature shape from the first axis:
     else:
-      y = np.array(y, ndmin=1)
+      self.n_samples = dims[0]
+      self.feature_shape = dims[1:]
 
-      # finding out sample axis if not specified and stores axis in params:
-      self.params.sample_axis = self.get_sample_axis(X, sample_axis)
-      self.n_samples = X.shape[self.params.sample_axis]
+    #check whether sample axis is chosen right by comparing number of
+    #samples in y and in given axis
+    if self.n_samples != len(y):
+      raise ValueError("Number of samples given in 'sample_axis' "
+                       f"({self.n_samples}) does not match with samples in "
+                       f"given in 'y' ({len(y)}). "
+                       "Please change your sample axis.")
 
-      #get feature shape:
-      feature_shape = np.take(X, 0, axis = self.params.sample_axis).shape
+    # sets number of features
+    self.n_features = np.prod(np.array(self.feature_shape))
 
-      #check whether sample axis is chosen right by comparing number of
-      #samples in y and in given axis
-      if self.n_samples != len(y):
-        raise ValueError("Number of samples given in 'sample_axis' "
-                         f"({self.n_samples}) does not match with samples in "
-                         f"given in 'y' ({len(y)}). "
-                         "Please change your sample axis.")
+    return X
 
-    return feature_shape
-
-
-  def get_sample_axis(self, X, sample_axis=None):
+  def _get_sample_axis(self, X, y, sample_axis):
     """
-    Automatically looks for the sample axis if no argument is given in
-    'sample_axis'.
+    Compares input data and targets to match the sample axis. If a sample axis
+    is specified, this will be skipped and the specified axis is returned.
 
     Parameters
     ----------
     X : ndarray
-      The input array.
-    sample_axis : int, optional
-      The dimension of the sample axis. The default is None.
+      Input array.
+    y : ndarray
+      Target array.
+    sample_axis : int
+      The sample dimension.
 
     Returns
     -------
     sample_axis : int
-      The spotted sample axis.
+      The actual sample dimension.
 
     """
-    if not sample_axis:
-      axis = np.argwhere(np.array(X.shape) == self.n_samples)
-      try:
-        sample_axis = int(axis)
-      except:
-        sample_axis = 0
+    if sample_axis:
+      sample_axis = sample_axis
+
     else:
-      sample_axis = self.params.sample_axis
+      # comparison with target values:
+      if y is not None:
+        sample_axis = int(np.argwhere(np.array(X.shape) == len(y)))
+
+      else:
+        sample_axis = sample_axis
 
     return sample_axis
 
@@ -293,7 +291,7 @@ class DataContainer:
     scale = self._feature_scale
     try:
       if 'x_bar' in scale.keys():
-        X_n = (X - scale['X_bar']) / scale['s'] # standardization
+        X_n = (X - scale['x_bar']) / scale['s'] # standardization
       else:
         X_n = X * scale['scale'] + scale['offset'] # min-max normalization
     except:
@@ -302,82 +300,95 @@ class DataContainer:
     return X_n
 
   def _standardize(self, X):
-    X, self._feature_scale = pre.standardize(X, axis=0, return_scale=True)
+    X, self._feature_scale = prep.standardize(X, axis=0, return_scale=True)
     return X
 
   def _min_max(self, X, a_max = 1., a_min = 0.):
-    X, self._feature_scale = pre.min_max(X, axis=0,
-                                         a_max=a_max, a_min=a_min,
-                                         return_scale=True)
+    X, self._feature_scale = prep.min_max(X, axis=0,
+                                          a_max=a_max, a_min=a_min,
+                                          return_scale=True)
     return X
 
-  # DIMENSIONALITY CHANGES
-  # The following methods change the dimensionality of the input arrays if they
-  # are wrongly shaped. This secures a training in each instance.
-  def convert_to_input_shape(self, X, input_layer):
-    """
-    Automatically converts the given dataset to match the requirements of the
-    input layers from Keras (e.g. Dense or Convolutional Layers).
+  def mean_centered(self, X):
+    if isinstance(self.mu, type(None)):
+      X_c, self.mu = prep.mean_centered(X, return_shift=True)
+    else:
+      X_c = prep.mean_centered(X, return_shift=False)
+    return X_c
 
-    If the dimensionality of the original data is too low, it will be expanded
-    at the previous last dimension. On the other hand, if it is too high, the
-    dimensionality will be reduced by multiplying the last two dimensions in
-    order to get only one remaining dimension with all features encoded in this
-    last dimension. The process iterates as long as the dimensionalities do not
-    match.
+  def scatter_matrix(self, X):
+    X_c = self.mean_centered(X)
+    S = X_c.T @ X_c
+    return S
+
+  def covariance_matrix(self, X):
+    """
+    Calculates the covariance of an array.
+    The covariance shows how much a variable is related to another.
 
     Parameters
     ----------
-    X : ndarray
-      Input array.
-    input_layer : str
-      Defines the input layer type. The layer types correspond to the
-      expressions used by Keras.
-
-    Raises
-    ------
-    NameError
-      The input layer is either not a possible keras input layer or not
-      implemented yet. Please try another layer.
+    X : float
+      Input array of the raw data.
 
     Returns
     -------
-    None.
+    Sigma : float
+      Covariance Matrix.
 
     """
-    layer_dims = {"Dense": 2,
-                  "Conv1D": 3,
-                  "Conv2D": 4,
-                  "Conv3D": 5}
-    try:
-      input_layer_dim = layer_dims[f"{input_layer}"]
+    n, m = X.shape
+    S = self.scatter_matrix(X)
+    Sigma = S / (n - 1)
+    return Sigma
 
-      while True:
-        X_dim = X.ndim
+  def correlation_matrix(self, X):
+    """
+    Calculates the Pearson correlation coefficients of the input matrix.
+    Pearsons correlation only refers to linear relations between two variables.
 
-        # expansion of dimensionality by adding another dimension after the
-        # previous last dimension
-        if input_layer_dim > X_dim:
-          X = np.expand_dims(X, axis = -1)
+    All correlation coefficents have values in the range between 0 and 1, where
+    1 denotes the highest correlation.
 
-        # reduction of dimensionality by multiplying the last two
-        # dimensionalities as the new reduced dimension
-        elif input_layer_dim < X_dim:
-          shape = ((self.n_samples, ) + X.shape[1:-2]
-                   + (X.shape[-2] * X.shape[-1], ))
-          X = X.reshape(shape)
+    X : float
+      Input array of the raw data.
 
-        else:
-          break
+    Returns
+    -------
+    R : float
+      Correlation Matrix.
 
-    except:
-      raise NameError(f"'{input_layer}' is either not a possible keras input "
-                      "layer or not implemented yet. Please try one of the "
-                      "following layers: "
-                      f"{layer_dims.keys()}.")
+    """
+    Sigma = self.covariance_matrix(X)
+    D_inv = np.diag(1 / np.sqrt(np.diag(Sigma)))
+    R = D_inv @ Sigma @ D_inv
+    return R
 
-    return X
+  def synchronous(self, X):
+    syn = self.covariance(X)
+    return syn
 
+  def asynchronous(self, X):
+    n, m = X.shape
+    X_c, self.mu = prep.mean_centered(X, return_shift=True)
+
+    def hilbert_noda(X):
+        N = np.empty([m, n])
+        for j in range(m):
+            for k in range(n):
+                if j == k:
+                    N[j,k] = 0
+                else:
+                    N[j,k] = 1 / (np.pi * (k-j))
+        return N
+
+    N = hilbert_noda(X_c)
+
+    S = X_c @ (X_c * N).T
+    asyn = S / (n - 1)
+    return asyn
+
+  # TARGET ENCODING:
   def categorical_labels(self, y):
     """
     Converts an one-hot encoded array into a categorical array. If the array is
@@ -397,7 +408,7 @@ class DataContainer:
       An array of categorical labels.
 
     """
-    y = pre.categorical(y)
+    y = prep.categorical(y)
     return y
 
   def one_hot_labels(self, y):
@@ -416,7 +427,7 @@ class DataContainer:
       An array of the one-hot encoded labels.
     """
     if y is not None:
-      y = pre.one_hot(y)
+      y = prep.one_hot(y)
     return y
 
   def train_test_split(self, X, y, test_split = 0.25, **kwargs):
@@ -446,7 +457,3 @@ class DataContainer:
     split = train_test_split(X, y, test_size=test_split, **kwargs)
 
     return split
-
-
-
-

@@ -1,6 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from spec_net.linear_transformation import ModelContainer as PCA
+from spec_net.linear_transformation import PCA
 import sklearn.datasets as datasets
 
 wine = datasets.load_wine()
@@ -12,19 +11,26 @@ y = wine.target
 features = np.array(wine.feature_names)
 # X = df.min_max_scale(data, axis = -1)
 # y = labels.reshape([len(labels), 1])
-
+# features = None
 PC = PCA(X, y, features=features,
-         n_components=4,
-         sample_axis=0,
-         normalization='standardize',
-         solver ='eigs')
+         n_components=2,
+         # sample_axis=0,
+         normalization='min-max',
+         solver='svd')
 
-# PC.plot.scree("both", show_average = True)
-# PC.plot.loadings_line()
-# PC.plot.loadings(FOI=["flavanoids"])
-# PC.plot.scores(projection=True)
-# PC.plot.biplot(FOI='alcohol')
-# PC.plot.contribution_bar(2, True)
-# PC.plot.contribution_circle()
-# PC.plot.contribution_heatmap(show_sum=True)
-# PC.plot.contribution_bars(components=[1,2], show_average=True)
+test = PC.data.X_train
+
+# img = PC.decode()
+def plot():
+  PC.plot.loadings([1,2], type='bar')
+  PC.plot.loadings([1,2], type='line')
+  PC.plot.loadings([1,2], FOI='alcohol', type='scatter')
+  PC.plot.scree("both", show_average = True)
+  PC.plot.scores(projection=True)
+  PC.plot.biplot('alcohol')
+  PC.plot.contribution_bar(1, True)
+  PC.plot.contribution_circle()
+  PC.plot.contribution_heatmap(show_sum=True)
+  PC.plot.contribution_bars(components=[1,2], show_average=True)
+
+plot()

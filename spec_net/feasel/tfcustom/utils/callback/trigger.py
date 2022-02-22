@@ -111,7 +111,7 @@ class CallbackTrigger(CallbackLog):
 
     """
     # stores loss or accuracy value:
-    self.value_l.append(logs[f'{self.params.eval_metric}']) # list of values
+    self.value_l.append(logs[f'{self.params.eval_type}']) # list of values
     self.value = self.value_l[-1] # current value
 
     # stores gradient of loss (or val_loss) value:
@@ -148,9 +148,9 @@ class CallbackTrigger(CallbackLog):
     """
     prune = False
 
-    if self.params.eval_metric in ['accuracy', 'val_accuracy']:
+    if self.params.eval_type in ['accuracy', 'val_accuracy']:
       x = self.value # must surpass threshold if accuracy-based
-    elif self.params.eval_metric in ['loss', 'val_loss']:
+    elif self.params.eval_type in ['loss', 'val_loss']:
       x = self.gradient # must surpass threshold if loss-based
 
     # threshold criterion:
