@@ -1,19 +1,14 @@
 import numpy as np
 from spec_net.linear_transformation import LDA
-import sklearn.datasets as datasets
-
-wine = datasets.load_wine()
-
-location = "U:/privat/Promotion_GewebedifferenzierungmittelsIR-Spektroskopie/D_Dataset/Wine/"
-
-X = wine.data
-y = wine.target
-features = np.array(wine.feature_names)
+data_path = "data/wine/npy/"
+X = np.load(data_path + "data.npy")
+y = np.load(data_path + "labels.npy")
+features = np.load(data_path + "features.npy")
 
 LD = LDA(X, y, features=features,
-         n_components=10,
+         n_components=2,
          normalization='standardize',
-         solver ='eigs')
+         solver ='svd')
 
 def plot():
   LD.plot.loadings([1,2], type='bar')
@@ -27,6 +22,7 @@ def plot():
   LD.plot.contribution_heatmap(show_sum=True)
   LD.plot.contribution_bars(components=[1,2], show_average=True)
 
+
+# plot()
 pred = LD.predict(X)
 decode = LD.decode(X) # decode doesn't really decode right
-LD.data._feature_scale

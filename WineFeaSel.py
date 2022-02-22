@@ -1,10 +1,10 @@
 import numpy as np
 from spec_net.feasel import DNN
 
-data_path = "data/wine/"
+data_path = "data/wine/npy/"
 X = np.load(data_path + "data.npy")
-y = np.load(data_path + "labels.npy").astype(int)
-features = np.load(data_path + "features.npy").squeeze()
+y = np.load(data_path + "labels.npy")
+features = np.load(data_path + "features.npy")
 
 # the FeaSel model container for Dense type neural networks:
 FS = DNN(X, y,
@@ -25,7 +25,7 @@ FS = DNN(X, y,
          architecture_type='exp-down',
          normalization='min-max',
          activation='relu',
-         loss = 'categorical_crossentropy')
+         loss='categorical_crossentropy')
 
 # sets some parameters outside of class instantiation:
 FS.set_n_layers(3)
@@ -36,10 +36,9 @@ FS.set_epochs(100)
 # starts the training process:
 FS.train_model()
 
-def plots():
+def plot():
   # Performance Evaluations:
   FS.plot.ROC(X, y)
-  FS.plot.save('roc')
   FS.plot.predict(X[1], y[1])
   FS.plot.predict_set(X, y, ['accuracy', 'sensitivity', 'specificity'])
   FS.plot.predict_set(X, y, 'precision')
