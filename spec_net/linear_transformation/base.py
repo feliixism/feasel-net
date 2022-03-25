@@ -1,7 +1,5 @@
 import numpy as np
-from scipy.linalg import eigh
 
-from .svd import SVD
 from .data import Regression
 from .parameters import Params
 from .plots import LinearTransformationVisualizer as Visualizer
@@ -325,7 +323,7 @@ class ModelContainer:
 
   def get_contribution(self):
     """
-    Calculates the contribution to each component.
+    Calculates the contribution to each component in percent.
 
     Returns
     -------
@@ -339,5 +337,5 @@ class ModelContainer:
       self.data.contribution = np.empty(self.data.loadings.shape)
 
       for i in range(len(self.data.loadings)):
-        self.data.contribution[i] = (np.abs(self.data.loadings[i])
+        self.data.contribution[i] = (np.abs(self.data.evecs[i])
                                      / np.sum(np.abs(self.data.loadings[i])))

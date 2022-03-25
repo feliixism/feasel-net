@@ -10,7 +10,7 @@ _ARCHITECTURE_TYPES = {'exponential': ['exp-down', 'exponential', 'exp.',
 
 class BuildParams(BaseParams):
   def __init__(self,
-               architecture_type='down',
+               architecture_type='linear',
                n_layers=3,
                n_features=None,
                n_nodes=None):

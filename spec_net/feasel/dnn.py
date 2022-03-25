@@ -1,4 +1,6 @@
 from tensorflow.keras.layers import Input, Dense
+import numpy as np
+
 from .tfcustom.callbacks import FeatureSelection
 from .tfcustom.layers import LinearPass
 from .parameters import Params
@@ -6,7 +8,7 @@ from .parameters import Params
 from .architectures import DenseDNN
 
 class FeaselDNN(DenseDNN):
-  def __init__(self, X, y, layer_name=None, n_features=None, **kwargs):
+  def __init__(self, X, y, layer_name, n_features=None, **kwargs):
     """
     The feature selection class object for Dense type deep neural networks
     (DNNs).
@@ -17,8 +19,8 @@ class FeaselDNN(DenseDNN):
       Input array for training (and validation) data.
     y : ndarray
       Input array for training (and validation) targets.
-    layer_name : str, optional
-      Layer name where the feature selection is applied. The default is None.
+    layer_name : str
+      Layer name where the feature selection is applied.
     n_features : int, optional
       Number of features that shall be remaining. If None, a compression ratio
       of 10 % is used. The default is None.
@@ -136,7 +138,7 @@ class FeaselDNN(DenseDNN):
 
     """
     if not self.params.callback.n_features:
-      n_features = int(self.data.feature_shape.size
+      n_features = int(np.product(self.data.feature_shape)
                        * self.params.callback.compression_rate)
 
     else:
@@ -174,7 +176,6 @@ class FeaselDNN(DenseDNN):
     return history
 
   def set_callback(self, layer_name, n_features=None, **kwargs):
-
     if not layer_name:
       raise KeyError("Please provide the layer for the feature "
                      "selection algorithm.")
@@ -202,5 +203,8 @@ class FeaselDNN(DenseDNN):
 
     return callback
 
-  def get_mask(self):
-    return self.callback.log.weights[-1].astype(bool)
+  def get_params():
+    return
+
+  def reset(self):
+    self.history = None

@@ -29,7 +29,7 @@ class DenseDNN(ModelContainer):
                        }
 
     # parameter container
-    self._building_params = {"architecture_type": "down",
+    self._building_params = {"architecture_type": "linear",
                              "n_layers": 3,
                              "n_nodes": None}
 
@@ -44,7 +44,7 @@ class DenseDNN(ModelContainer):
       # random state is set constant for reproducability:
       split = self.data.train_test_split(self.data.X_train, self.data.y_train,
                                          self.params.train.test_split,
-                                         random_state = 42)
+                                         random_state=42)
       self.data.X_train, self.data.X_test = split[0:2]
       self.data.y_train, self.data.y_test = split[2:4]
 
@@ -222,7 +222,7 @@ class DenseDNN(ModelContainer):
       n_nodes = self.n_in
 
     for i in range(1, n_layers+1):
-      x = Dense(int(n_nodes / (2 * i)),
+      x = Dense(int(np.round(n_nodes / (2 * i), 0)),
                 activation=self.params.train.activation,
                 name=f"Dense{i}")(x)
       x = self.get_dropout(x, i)

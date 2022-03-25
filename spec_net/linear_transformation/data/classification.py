@@ -89,7 +89,15 @@ class DataContainer:
                        "network useage.")
 
     self.X_train, self.y_train = self.prepare(self.X, self.y)
-    self.X_test, self.y_test = None, None
+
+    if self.params.test_split:
+      split = self.train_test_split(self.X_train, self.y_train,
+                                    test_split=self.params.test_split,
+                                    random_state=42)
+      self.X_train, self.X_test, self.y_train, self.y_test = split
+
+    else:
+      self.X_test, self.y_test = None, None
 
   def __repr__(self):
       return (f"Data(Size of Dataset: {self.X.shape}, "

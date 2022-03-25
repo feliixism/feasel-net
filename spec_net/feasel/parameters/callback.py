@@ -13,14 +13,14 @@ _EVAL_TYPES = {'accuracy': ['accuracy', 'acc', 'acc.'],
                'val_accuracy': ['val_accuracy', 'val_acc'],
                'val_loss': ['val_loss']}
 
-_NORM_TYPES = {'min_max': ['min_max', 'min-max', 'min max', 'min-max scale'],
+_NORM_TYPES = {'min-max': ['min_max', 'min-max', 'min max', 'min-max scale'],
                'standardize': ['standardize', 'standard',
                                'z score', 'z-score']}
 
-_METRIC_MAP = {'cross_entropy': cross_entropy,
+_METRIC_MAP = {'cross-entropy': cross_entropy,
                'entropy': entropy}
 
-_METRIC_TYPES = {'cross_entropy': ['cross_entropy', 'CE'],
+_METRIC_TYPES = {'cross-entropy': ['cross-entropy', 'cross_entropy', 'CE'],
                  'entropy': ['entropy']}
 
 _DECISION_TYPES = {'average': ['average', 'mean', 'avrg', 'mu'],
@@ -53,8 +53,9 @@ class CallbackParams(BaseParams):
                n_samples=None,
                loss_ratio=0.1,
                decision_metric='average',
-               scale=False,
-               rationalize=True,
+               remove_outliers=True,
+               reset_weights=False,
+               # rationalize=True,
                loocv=True):
     """
     Parameter class for the trigger control of the leave-one-out
@@ -87,7 +88,7 @@ class CallbackParams(BaseParams):
     eval_metric : str, optional
       The metric function that is exectuted for the evaluation of the features'
       importances. See _METRIC_TYPES for the possible arguments. The default is
-      'cross_entropy'.
+      'cross-entropy'.
     pruning_type : str, optional
       The type of node reduction for the recursive feature elimination. See
       _PRUNING_TYPES for the possible arguments. The type of pruning determines
@@ -118,8 +119,9 @@ class CallbackParams(BaseParams):
       The minimum ratio of the difference of the first pruned and last kept
       feature and the best overall feature loss that has to be obtained in
       order to trigger pruning (2nd pruning stage). The default is 0.1.
-    scale : bool, optional
-      If True, it scales the evaluated feature loss. The default is 'False'.
+    remove_outliers : bool, optional
+      If True, it will remove all outliers from the evaluation data. The
+      default is True.
     decision_metric : str, optional
       Sets the metric for the decision, which features are to be pruned. The
       possible options are 'median' or 'average'. The default is 'average'.
@@ -127,6 +129,9 @@ class CallbackParams(BaseParams):
       If True, it will put the previously pruned feature loss into relation to
       the feature losses of the currently evaluated features. The default is
       'True'.
+    reset_weights : bool, optional
+      If True, the weights will be reset at every pruning epoch such that the
+      algorithm is unbiased for the next prune. The default is 'False'.
     loocv : bool, optional
       If True, it will apply the principle of the LOOCV and mask only one
       feature per classification. If False, it will use the inverse LOOCV and
@@ -150,9 +155,11 @@ class CallbackParams(BaseParams):
     self.set_loss_ratio(loss_ratio)
     self.set_loocv(loocv)
     self.set_decay(decay)
-    self.set_scale(scale)
+    self.set_remove_outliers(remove_outliers)
+    self.set_reset_weights(reset_weights)
+    self.set_compression_rate(compression_rate)
     self.set_decision_metric(decision_metric)
-    self.set_rationalize(rationalize)
+    # self.set_rationalize(rationalize)
     self.set_normalization(eval_normalization)
 
     self._MAP = {'eval_metric': self.set_metric,
@@ -170,8 +177,9 @@ class CallbackParams(BaseParams):
                  'loocv': self.set_loocv,
                  'decay': self.set_decay,
                  'decision_metric': self.set_decision_metric,
-                 'scale': self.set_scale,
-                 'rationalize': self.set_rationalize,
+                 'remove_outliers': self.set_remove_outliers,
+                 'reset_weights': self.set_reset_weights,
+                 # 'rationalize': self.set_rationalize,
                  'eval_normalization': self.set_normalization}
 
   def __repr__(self):
@@ -228,7 +236,7 @@ class CallbackParams(BaseParams):
     self.n_features = n_features
 
   def set_compression_rate(self, compression_rate):
-    if not self.n_features:
+    if isinstance(self.n_features, type(None)):
       if compression_rate:
         self.compression_rate = compression_rate
       else:
@@ -254,8 +262,11 @@ class CallbackParams(BaseParams):
   def set_decision_metric(self, decision_metric):
     self.decision_metric = self._get_decision_metric(decision_metric)
 
-  def set_scale(self, scale):
-    self.scale = scale
+  def set_remove_outliers(self, remove_outliers):
+    self.remove_outliers = remove_outliers
+
+  def set_reset_weights(self, reset_weights):
+    self.reset_weights = reset_weights
 
   def set_rationalize(self, rationalize):
     self.rationalize = rationalize
@@ -350,7 +361,7 @@ class CallbackParams(BaseParams):
   def _get_metric(self, eval_metric):
       """
       Provides different aliases for all possible metrics and searches for
-      the corresponding metric (e.g. 'CE' --> 'cross_entropy').
+      the corresponding metric (e.g. 'CE' --> 'cross-entropy').
 
       Parameters
       ----------
@@ -511,5 +522,10 @@ class CallbackParams(BaseParams):
       The losses between each data set.
 
     """
-    loss = _METRIC_MAP[f'{self.eval_metric}'](P,Q)
+    if not isinstance(P, type(None)):
+      loss = _METRIC_MAP[f'{self.eval_metric}'](P, Q)
+
+    else:
+      loss = _METRIC_MAP['entropy'](P, Q)
+
     return loss

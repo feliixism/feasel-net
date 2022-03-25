@@ -89,8 +89,9 @@ class LDA(ModelContainer):
       self.data.mean_centered(self.data.X_train) # sets 'data.mu'
       self.data.scatter_w = np.zeros([self.data.n_features, self.data.n_features])
       self.data.scatter_b = np.zeros([self.data.n_features, self.data.n_features])
+
       for c in self.data.classes: # handbook of statistics (Cheriet 2013)
-        idx = np.argwhere(self.y == c).flatten()
+        idx = np.argwhere(self.data.y_train == c).flatten()
         data = self.data.X_train[idx]
         # add data to each class:
         self.data.class_props['n'].append(len(data))

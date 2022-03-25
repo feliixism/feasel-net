@@ -8,7 +8,8 @@ class DataParams(BaseParams):
   def __init__(self,
                normalization=None,
                sample_axis=None,
-               mean_centered=False):
+               mean_centered=False,
+               test_split=0.2):
     """
     Parameter class for all data parameters.
 
@@ -19,6 +20,10 @@ class DataParams(BaseParams):
     sample_axis : int, optional
       The axis of the input array X where the samples are located. The default
       is None.
+    mean_centered : bool,
+      Defines whether or not the data is mean-centered. The default is 'False'.
+    test_split : float,
+      The ratio for the test data. The default is '0.2'.
 
     Returns
     -------
@@ -29,6 +34,7 @@ class DataParams(BaseParams):
     self.normalization = normalization
     self.sample_axis = sample_axis
     self.mean_centered = mean_centered
+    self.test_split = test_split
 
     self._MAP = {'normalization': self.set_normalization,
                  'sample_axis': self.set_sample_axis,
@@ -47,6 +53,9 @@ class DataParams(BaseParams):
 
   def set_mean_centered(self, mean_centered):
     self.mean_centered = mean_centered
+
+  def set_test_split(self, test_split):
+    self.test_split = test_split
 
   # HELPERS:
   def _get_normalization(self, normalization):

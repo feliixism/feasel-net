@@ -106,7 +106,8 @@ class LinearTransformationVisualizer(Base):
     # average variance and indices where average > oev:
     avg = np.sum(self.container.data.oev[0]
                      / len(self.container.data.oev[0]))
-    idx = np.argwhere(oev < avg).flatten()
+    idx1 = np.argwhere(oev < avg).flatten()
+    idx2 = np.argwhere(oev > avg).flatten()
 
     ticklabels = self.components['name']
     ticks = np.array(self.components['idx'])
@@ -114,7 +115,7 @@ class LinearTransformationVisualizer(Base):
     if type == 'bar':
       ax.bar(ticks, oev, color=bright1)
       for i in ticks:
-        ax.text(i, oev[i], np.round(oev[i], 1), ha='center', color=bright1)
+        ax.text(i, oev[i] + 1, np.round(oev[i], 1), ha='center', color=bright1)
 
 
     elif type == 'cummulative':
@@ -127,19 +128,26 @@ class LinearTransformationVisualizer(Base):
       ax.bar(ticks, oev, color=bright1)
       ax.plot(np.arange(len(cev))-0.5, cev, color=dark,
               marker='.', label='cummulative')
-      for i in ticks:
-        ax.text(i, oev[i], np.round(oev[i], 1), ha='center', color=bright1)
 
     if show_average:
       ax.axhline(y=avg, color=dark, ls="-.",
                  label='average', zorder = 0)
 
       if type == 'bar' or type == 'both':
-        ax.bar(ticks[idx], oev[idx], color=bright2)
+        ax.bar(ticks[idx1], oev[idx1], color=bright2)
+        for i in idx1:
+          ax.text(ticks[i], oev[i] + 1, np.round(oev[i], 1), ha='center',
+                  color=bright2)
+        for i in idx2:
+          ax.text(ticks[i], oev[i] + 1, np.round(oev[i], 1), ha='center',
+                  color=bright1)
+      else:
+        for i in ticks:
+          ax.text(i, oev[i] + 1, np.round(oev[i], 1), ha='center',
+                  color=bright1)
 
       ax.legend()
 
-    ax.set_xlabel('component')
     ax.set_xticks(ticks)
     ax.set_xticklabels(ticklabels)
     ax.set_xlim(-0.5, len(oev)-0.5)
@@ -175,7 +183,7 @@ class LinearTransformationVisualizer(Base):
 
     self.container.get_loadings()
 
-    fig = plt.figure("Loadings lineplot", figsize=(full_width, 4))
+    fig = plt.figure("Loadings lineplot", figsize=(half_width, 4))
     fig.clf()
     ax = fig.add_subplot(111)
 
@@ -194,8 +202,11 @@ class LinearTransformationVisualizer(Base):
     # x-axis:
     ax.set_xlabel('feature')
     ax.set_xlim(0, self.container.data.n_features-1)
-    ax.set_xticks(self.container.data.features)
-    ax.set_xticklabels(self.container.data.features, rotation=-45, ha="left")
+
+    if self.container.data.features.dtype.type == np.str_:
+      ax.set_xticks(self.container.data.features)
+      ax.set_xticklabels(self.container.data.features,
+                              rotation=-45, ha="left")
 
     ax.legend(loc='upper center', ncol=len(idx))
 
@@ -225,7 +236,7 @@ class LinearTransformationVisualizer(Base):
 
     n = len(components)
 
-    fig = plt.figure("Loadings barplot", figsize=(full_width, n*3))
+    fig = plt.figure("Loadings barplot", figsize=(half_width, n*2))
     fig.clf()
     fig, axs = plt.subplots(n, 1, sharex=True, sharey=True,
                             num="Loadings barplot", figsize=(full_width, n*3))
@@ -235,13 +246,14 @@ class LinearTransformationVisualizer(Base):
       axs[i].bar(self.container.data.features, self.container.data.loadings[i])
 
       # y-axis:
-      axs[i].set_ylabel(f"{self.components['name'][i]} loadings [-]")
+      axs[i].set_ylabel(f"{self.components['name'][i]} "
+                        f"[{np.round(self.container.data.oev[0][i], 1)}\,\%]")
 
     # x-axis:
-    axs[-1].set_xlabel('feature')
+    # axs[-1].set_xlabel('feature')
     axs[-1].set_xlim(-0.5, self.container.data.n_features-0.5)
 
-    if self.container.data.features.dtype == 'str':
+    if self.container.data.features.dtype.type == np.str_:
       axs[-1].set_xticks(self.container.data.features)
       axs[-1].set_xticklabels(self.container.data.features,
                               rotation=-45, ha="left")
@@ -322,7 +334,7 @@ class LinearTransformationVisualizer(Base):
     ax.bar(np.arange(len(features)), height=height)
     ax.set_xticks(range(len(features)))
 
-    if features.dtype == 'str':
+    if features.dtype.type == np.str_:
       ax.set_xticklabels(features, rotation=-45, ha='left')
     else:
       ax.set_xticklabels(features, ha='center')
@@ -339,7 +351,6 @@ class LinearTransformationVisualizer(Base):
 
     # x-axis:
     ax.set_xlim(-0.5, len(height)-0.5)
-    ax.set_xlabel('features')
 
   def contribution_bars(self, components=[1, 2], show_average=False):
     """
@@ -362,25 +373,25 @@ class LinearTransformationVisualizer(Base):
     None.
 
     """
-    fig = plt.figure('Contribution bars', figsize=(half_width, half_width))
+    dark = self.c_cmap(16)
+    fig = plt.figure('Contribution bars', figsize=(half_width, 2))
     fig.clf()
     ax = fig.add_subplot(111)
 
     components = np.array(components, ndmin=1) - 1
     width = 0.8 / len(components)
 
-    self.container.get_contribution()
+    self.container.get_eigs()
 
-    heights = self.container.data.contribution[components]
+    heights = np.abs(self.container.data.loadings[components])
+    height_sum = np.sum(heights, axis=0)
 
-    heights = heights / np.sum(heights) * 100
-    height = np.sum(heights, axis=0)
-
-    idx = np.flip(np.argsort(np.abs(height)))
-    height = height[idx] / np.sum(height) * 100
+    idx = np.flip(np.argsort(np.abs(height_sum)))
+    height = height_sum[idx] / np.sum(height_sum) * 100
+    heights = heights / np.sum(height_sum) * 100
     features = self.container.data.features[idx]
     x = np.arange(self.container.data.n_features)
-    ax.bar(x, height=np.abs(height), color='k', alpha=0.25, edgecolor='k',
+    ax.bar(x, height=np.abs(height), color=dark, alpha=0.25, edgecolor=dark,
            label='sum')
 
     for i, h in enumerate(heights):
@@ -390,21 +401,20 @@ class LinearTransformationVisualizer(Base):
 
     ax.set_xticks(x)
 
-    if features.dtype == 'str':
+    if features.dtype.type == np.str_:
       ax.set_xticklabels(features, rotation=-45, ha='left')
     else:
       ax.set_xticklabels(features, ha='center')
 
     if show_average:
-      ax.axhline(np.mean(height), color='k', ls='-.', zorder=0,
-                 label='average')
-      ax.legend(loc='upper right')
+      ax.axhline(np.mean(height), color=dark, ls='-.', zorder=0)
+
+    ax.legend(loc='upper right')
 
     ax.set_ylim(0, height[0] * 1.05)
-    ax.set_ylabel("conribution to components [$\%$]")
+    ax.set_ylabel("conribution [$\%$]")
 
-    ax.set_xlim(-0.5, x[-1] - 0.5)
-    ax.set_xlabel('features')
+    ax.set_xlim(-0.5, x[-1] + 0.5)
 
   def plot_features_of_interest(self, FOI, x, y):
     """
@@ -593,7 +603,7 @@ class LinearTransformationVisualizer(Base):
     cbar.ax.set_ylabel("contribution [$\%$]")
 
   # implement 3rd component for 3d plot:
-  def scores(self, component_x=1, component_y=2,
+  def scores(self, X=None, y=None, component_x=1, component_y=2,
              projection=False,
              decision_boundaries=False,
              confidence_interval=3):
@@ -626,7 +636,12 @@ class LinearTransformationVisualizer(Base):
     None.
 
     """
-    self.container.get_scores()
+    if X:
+      target = y
+    else:
+      target = self.container.data.y_train
+
+    scores = self.container.get_scores(X)
 
     fig = plt.figure("Scores Plot", figsize=(half_width, half_width))
     fig.clf()
@@ -654,22 +669,25 @@ class LinearTransformationVisualizer(Base):
       ax = fig.add_subplot(111)
 
     if self.component_type == 'PC':
-      self.scores_pca(ax, component_x, component_y,
+      self.scores_pca(ax, scores, target, component_x, component_y,
                       projection=projection,
                       projection_axes=[ax1, ax2],
                       confidence_interval=confidence_interval)
 
     elif self.component_type == 'LD':
-      self.scores_lda(ax, component_x, component_y,
+      self.scores_lda(ax, scores, target, component_x, component_y,
                       projection=projection,
                       projection_axes=[ax1, ax2],
                       decision_boundaries=decision_boundaries,
                       confidence_interval=confidence_interval)
 
-    ax.set_xlabel(self.components['name'][component_x - 1])
-    ax.set_ylabel(self.components['name'][component_y - 1])
+    idx_x, idx_y = component_x - 1, component_y - 1
+    ax.set_xlabel(f"{self.components['name'][idx_x]} "
+                  f" [{np.round(self.container.data.oev[0][idx_x], 1)}\,\%]")
+    ax.set_ylabel(f"{self.components['name'][idx_y]} "
+                  f" [{np.round(self.container.data.oev[0][idx_y], 1)}\,\%]")
 
-  def scores_pca(self, ax, component_x=1, component_y=2,
+  def scores_pca(self, ax, scores, target, component_x=1, component_y=2,
                  projection=False, projection_axes=[None, None],
                  confidence_interval=None):
       """
@@ -703,27 +721,30 @@ class LinearTransformationVisualizer(Base):
       None.
 
       """
+      if isinstance(scores, type(None)):
+        scores = self.container.data.scores
+
       x, y = component_x - 1, component_y - 1
 
-      limit = np.amax(np.abs(self.container.data.scores[:, [x, y]])) * 1.05
+      limit = np.amax(np.abs(scores[:, [x, y]])) * 1.05
 
       ax.set_ylim(-limit, limit)
       ax.set_xlim(-limit, limit)
 
-      if self.container.y is not None:
+      if target is not None:
         for i, c in enumerate(self.container.data.classes):
-          mask = np.argwhere(self.container.y == c).flatten()
-          scores = self.container.data.scores[mask][:,np.array([x, y])]
+          mask = np.argwhere(target == c).flatten()
+          S = scores[mask][:,np.array([x, y])]
 
           color = self.c_cmap(i * 4)
-          cov = np.cov(scores.T)
-          mu = np.average(scores, axis=0)
+          cov = np.cov(S.T)
+          mu = np.average(S, axis=0)
 
           if confidence_interval:
             confidence(ax, cov, mu, s=confidence_interval)
 
-          ax.scatter(scores[:, 0], scores[:, 1],
-                      alpha=0.7, color=color, label=c)
+          ax.scatter(S[:, 0], S[:, 1],
+                     alpha=0.7, color=color, label=c)
 
           ax.scatter(mu[0], mu[1], marker='X', color=color, edgecolors="k")
 
@@ -744,16 +765,16 @@ class LinearTransformationVisualizer(Base):
             projection_axes[1].plot(X, projection_0)
             projection_axes[0].plot(projection_1, X)
 
-      else:
-        ax.scatter(self.container.data.scores[:, x],
-                   self.container.data.scores[:, y],
-                   alpha=0.7)
+          ax.legend(loc='upper right')
 
-  def scores_lda(self, ax, component_x=1, component_y=2,
-                  projection=False,
-                  projection_axes=[None, None],
-                  decision_boundaries=False,
-                  confidence_interval=3):
+      else:
+        ax.scatter(scores[:, x], scores[:, y], alpha=0.7)
+
+  def scores_lda(self, ax, scores, target, component_x=1, component_y=2,
+                 projection=False,
+                 projection_axes=[None, None],
+                 decision_boundaries=False,
+                 confidence_interval=3):
     """
     The scores plot shows the samples in the new latent feature space defined
     by the given components.
@@ -775,9 +796,12 @@ class LinearTransformationVisualizer(Base):
     None.
 
     """
+    if isinstance(scores, type(None)):
+      scores = self.container.data.scores
+
     x, y = component_x - 1, component_y - 1
 
-    limit = np.amax(np.abs(self.container.data.scores[:, [x, y]])) * 1.05
+    limit = np.amax(np.abs(scores[:, [x, y]])) * 1.05
 
     ax.set_ylim(-limit, limit)
     ax.set_xlim(-limit, limit)
@@ -785,25 +809,24 @@ class LinearTransformationVisualizer(Base):
     colors_l = []
 
     for i, c in enumerate(self.container.data.classes):
-      mask = np.argwhere(self.container.y == c).flatten()
-      scores = self.container.data.scores[mask][:,np.array([x, y])]
+      mask = np.argwhere(target == c).flatten()
+      S = scores[mask][:, np.array([x, y])]
 
       color = self.c_cmap(i * 4)
       colors_l.append(color)
-      cov = np.cov(scores.T)
-      mu = np.average(scores, axis=0)
+      cov = np.cov(S.T)
+      mu = np.average(S, axis=0)
 
       if confidence_interval:
         confidence(ax, cov, mu, s=confidence_interval)
 
-      ax.scatter(scores[:, 0], scores[:, 1],
+      ax.scatter(S[:, 0], S[:, 1],
                  alpha=0.7, color=color, label=c)
 
       ax.scatter(mu[0], mu[1], marker='X', color=color, edgecolors="k")
 
       # projection of scatter plot onto x- and y-axis:
       if projection:
-
         X = np.linspace(-limit, limit, 100)
 
         exp_0 = np.exp(-(X - mu[0])**2 / (2 * cov[0, 0]))
@@ -834,7 +857,7 @@ class LinearTransformationVisualizer(Base):
                                            components=[x, y],
                                            transformed=True)
           conf[j, i] = np.diff(d[:, np.argsort(d)[0,-2:]])
-          delta[j, i] = self.container.data.classes[np.argmax(np.array(d))]
+          delta[j, i] = np.argmax(np.array(d))
 
       conf = (conf - np.amin(conf)) / (np.amax(conf) - np.amin(conf))
 
@@ -842,6 +865,8 @@ class LinearTransformationVisualizer(Base):
                                y_decision[0], y_decision[-1]],
                 cmap=cmap, zorder=-2, origin='lower',
                 alpha=conf, interpolation='hamming')
+
+    ax.legend(loc='upper right')
 
   def biplot(self, FOI, component_x=1, component_y=2, loading_scale=1, ):
     """
@@ -878,9 +903,13 @@ class LinearTransformationVisualizer(Base):
 
     # plot scores:
     if self.component_type == 'PC':
-      self.scores_pca(ax, component_x, component_y)
+      self.scores_pca(ax, scores=None,
+                      target=self.container.data.y_train,
+                      component_x=component_x, component_y=component_y)
     elif self.component_type == 'LD':
-      self.scores_lda(ax, component_x, component_y)
+      self.scores_lda(ax, scores=None,
+                      target=self.container.data.y_train,
+                      component_x=component_x, component_y=component_y)
 
     # plot loadings as arrows:
     # scaling loadings on same scale as scores
