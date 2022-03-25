@@ -74,15 +74,6 @@ class DefaultPlot:
 
     params['figure.dpi'] = 100
 
-    # fontsizes
-    params.update({'font.size': '10',
-                   'axes.labelsize': 'x-small',
-                   'axes.titlesize': 'x-small',
-                   'legend.fontsize': 'x-small',
-                   'xtick.labelsize': 'x-small',
-                   'ytick.labelsize': 'x-small'
-                   })
-
     # ticks
     params.update({'xtick.major.size': '2',
                    'xtick.minor.size': '1',
@@ -107,8 +98,8 @@ class DefaultPlot:
 
     # constrained_layout:
     params.update({'figure.constrained_layout.use': True,
-                   'figure.constrained_layout.h_pad': 0.05,
-                   'figure.constrained_layout.w_pad': 0.05,
+                   'figure.constrained_layout.h_pad': 0.,
+                   'figure.constrained_layout.w_pad': 0.,
                    'figure.constrained_layout.hspace': 0.05,
                    'figure.constrained_layout.wspace': 0.05,
                    })

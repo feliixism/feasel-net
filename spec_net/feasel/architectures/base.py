@@ -14,6 +14,7 @@ class ModelContainer:
                name=None, **kwargs):
     self.X = X
     self.y = y
+    self.history = None
 
     if features is not None:
       self.features = np.array(features)
@@ -427,7 +428,7 @@ class ModelContainer:
     """
     test_model = Model(inputs=self.model.inputs,
                        outputs=self.model.get_layer(layername).output)
-    feature_maps = self.test_model(X, model=test_model)
+    feature_maps = self.test(X, model=test_model)
 
     return feature_maps
 
@@ -502,7 +503,7 @@ class ModelContainer:
 
     return history
 
-  def train_model(self):
+  def train(self):
     """
     Trains the generically built model. Same functionality as
     'fit_model()'.
@@ -513,14 +514,13 @@ class ModelContainer:
       Training history of the neural network.
 
     """
-    if not hasattr(self, 'history'):
-        self.model = self.get_model()
-        self.compile_model()
-        self.history = self.fit_model()
-
+    if isinstance(self.history, type(None)):
+      self.model = self.get_model()
+      self.compile_model()
+      self.history = self.fit_model()
     return self.history
 
-  def test_model(self, X_test, y_test=None, model=None):
+  def test(self, X_test, y_test=None, model=None):
     """
     Tests the generically built model.
 
@@ -548,7 +548,7 @@ class ModelContainer:
 
     return y_pred, y_true
 
-  def save_model(self):
+  def save(self):
     model_path = (f"models/{self.model_type}/{self.architecture_type}/"
                   f"{self.epochs}_epochs_{len(self.x_train[0])}_datasize")
     path, filename = os.path.split(model_path)
@@ -569,7 +569,7 @@ class ModelContainer:
     self.model.save_weights(path + "/" + filename + ".h5")
     print("Saved model to disk.")
 
-  def load_model(self, model_path):
+  def load(self, model_path):
     self.model_type = model_path.split("/")[1]
     self.architecture_type = model_path.split("/")[2]
     self.model = keras.models.load_model(model_path)

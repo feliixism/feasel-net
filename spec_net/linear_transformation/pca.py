@@ -2,13 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.linalg import eigh
 
+from .base import ModelContainer
 from .svd import SVD
 from .data import Regression
 from .parameters import Params
 from .plots import LinearTransformationVisualizer as Visualizer
 from ..utils.time import get_timestamp
 
-class ModelContainer:
+class PCA(ModelContainer):
   def __init__(self, X, y=None,
                features=None,
                name=None,
@@ -52,8 +53,11 @@ class ModelContainer:
     # embed plot class
     self._plot = Visualizer(self)
 
+    self.p = self.data.n_features
+    self.q = self.params.build.n_components
+
   def __str__(self):
-    return 'ModelContainer for Linear Trasformations'
+    return 'ModelContainer for PCAs'
 
   def __repr__(self):
     return (f"PCA(n_features: {self.data.n_features}, "
@@ -167,7 +171,7 @@ class ModelContainer:
     None.
 
     """
-    if self.data.evals:
+    if self.data.evals is not None:
       return
 
     D = self.get_dependencies(self.data.X_train, self.params.build.method)
@@ -183,120 +187,11 @@ class ModelContainer:
     elif self.params.build.solver == 'svd':
       svd = SVD(D)
       U, Sigma, Vh = svd()
-      evals, evecs = np.diagonal(Sigma)**2 / (self.data.n_samples-1), Vh
+      evals, evecs = np.diagonal(Sigma), Vh.T
 
     self.data.score_variance = evals**2
     self.data.evals, self.data.evecs = np.array(evals, ndmin=2), evecs
     self.get_overall_explained_variance()
-
-  def get_overall_explained_variance(self):
-    """
-    Calculates the overall explained variance of each principal component.
-
-    Returns
-    -------
-    None.
-
-    """
-    var = self.data.evals
-    oev = var / np.sum(var) * 100
-    cev = np.zeros(self.data.evals.shape)
-
-    for i in range(len(self.data.evals[0])):
-      if i > 0:
-        cev[0, i] = (oev[0, i] + cev[0, i - 1])
-
-      else:
-        cev[0, i] = oev[0, i]
-
-    self.data.oev = oev
-    self.data.cev = cev
-
-  def get_loadings(self):
-    """
-    Calculates the so-called loading-factors of each principal component.
-    The loadings can be interpreted as weights for the orthogonal linear
-    transformation of the original features into the new latent features.
-
-    Returns
-    -------
-    None.
-
-    """
-    if not isinstance(self.data.evals, np.ndarray):
-      self.get_eigs()
-
-    evals, evecs = self.data.evals, self.data.evecs
-
-    # select q most important components:
-    p = self.data.n_features
-    I = np.identity(p)
-
-    self.data.loadings = I * np.sqrt(evals) @ evecs.T
-
-  def get_scores(self, X_test=None):
-    """
-    Calculates the values of the original features projected into the new
-    latent variable space described by the corresponding principal
-    components.
-
-    Returns
-    -------
-    None.
-
-    """
-    if not isinstance(self.data.loadings, np.ndarray):
-      self.get_loadings()
-
-    if not X_test:
-      X_test = self.data.X_train
-      scores = (self.data.loadings @ X_test.T).T
-      self.data.scores = scores
-
-    else:
-      scale = self.data._feature_scale
-
-      # standardization:
-      if 'x_bar' in scale.keys():
-        X_test = (X_test - scale['x_bar']) / scale['s']
-
-      # min-max normalization:
-      elif 'offset' in scale.keys():
-        X_test = scale['scale'] * X_test + scale['offset']
-
-      scores = (self.data.loadings @ X_test.T).T
-
-    return scores
-
-    # for class_ in self.classes[0]:
-    #   mask = np.where(self.y == class_)[0]
-    #   self.log[f"{class_}"]["scores"] = self.scores[mask]
-    #   self.log[f"{class_}"]["scores_var"] = np.var(self.log[f"{class_}"]["scores"], axis = 0)
-    #   self.log[f"{class_}"]["scores_mean"] = np.mean(self.log[f"{class_}"]["scores"], axis = 0)
-
-    # self.var_scores = np.var(self.scores, axis = 0, ddof = 1)
-    # self._scores = True
-
-  def decode(self):
-    if not self.data.scores:
-      self.get_scores()
-
-    X_decoded = (self.scores @ self.evecs[:self.n_components]).T
-    return X_decoded
-
-  def plot_reduction(self):
-    if self._reduced == False:
-        self.get_reduced_X()
-
-    n_pixels = self.n_samples * self.n_features
-    reduction = np.round((1 - (self.scores.size + self.evecs[:self.n_components].size) / n_pixels) * 100, 2)
-    mse = np.sum((self.reduced_X - self.preprocessed_X)**2) / n_pixels
-    psnr = -np.log10(mse / (np.amax(self.preprocessed_X) + np.abs(np.amin(self.preprocessed_X)))**2)
-    fig, axs = plt.subplots(2,1)
-    axs[0].imshow(self.X.T)
-    axs[0].title.set_text("Original")
-    axs[1].imshow(self.reduced_X.T)
-    axs[1].title.set_text(f"Reduction: {reduction} \%; PSNR: {psnr:0.2f} dB")
 
   def get_important_features(self, n_var, d_min = 0):
       """

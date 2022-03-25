@@ -1,3 +1,4 @@
+from . import analysis
 from . import architectures
 from . import data
 from . import dnn

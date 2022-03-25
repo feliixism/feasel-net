@@ -1,4 +1,5 @@
 from . import classification
+from . import metrics
 from . import preprocess
 from . import regression
 

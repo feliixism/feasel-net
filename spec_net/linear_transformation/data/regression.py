@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-from ..parameters import BuildParams, DataParams
+from ..parameters import DataParams
 from . import preprocess as prep
 
 class DataContainer:
@@ -80,7 +80,13 @@ class DataContainer:
                        "network useage.")
 
     self.X_train, self.y_train = self.prepare(self.X, self.y)
-    self.X_test, self.y_test = None, None
+    if self.params.test_split:
+      split = self.train_test_split(self.X_train, self.y_train,
+                                    test_split=self.params.test_split,
+                                    random_state=42)
+      self.X_train, self.X_test, self.y_train, self.y_test = split
+    else:
+      self.X_test, self.y_test = None, None
 
   def __repr__(self):
       return (f"Data(Size of Dataset: {self.X.shape}, "
@@ -115,13 +121,12 @@ class DataContainer:
 
     """
 
-    self.feature_shape = self.assort(X, y, self.params.sample_axis)
-    self.n_features = np.prod(np.array(self.feature_shape))
-    shape = (self.n_samples, ) + self.feature_shape
+    X = self.assort(X, y, self.params.sample_axis)
 
-    # reshapes the input array to match the target data in terms of samples
-    # axis and features
-    X = X.reshape(shape)
+    if isinstance(self.features, type(None)):
+      self.features = np.arange(self.n_features).reshape(self.feature_shape)
+
+    self.sample_axis = 0 # resetted after reshape
 
     # normalization:
     X = self.normalize(X, self.params.normalization)
@@ -150,72 +155,71 @@ class DataContainer:
 
     Returns
     -------
-    feature_shape : tuple
-      The shape of the features of the input array.
+    X : ndarray
+      The re-ordered array.
 
     """
 
     X = np.array(X, ndmin=2)
+    dims = X.shape
 
-    if y is not None:
-      # take number of samples and the feature shape from the sample axis:
-      if self.params.sample_axis:
-        self.n_samples = X.shape[sample_axis]
-        feature_shape = np.take(X, 0, axis=sample_axis).shape
+    sample_axis = self._get_sample_axis(X, y, sample_axis)
 
-      # take number of samples and the feature shape from the first axis:
-      else:
-        self.n_samples = X.shape[0]
-        feature_shape = X.shape[1:]
+    if sample_axis:
+      # set n_samples and feature_shape:
+      self.n_samples = dims[sample_axis]
+      self.feature_shape = np.take(X, 0, axis=sample_axis).shape
 
-      #check whether sample axis is chosen right by comparing number of
-      #samples in y and in given axis
-      if self.n_samples != len(y):
-        raise ValueError("Number of samples given in 'sample_axis' "
-                         f"({self.n_samples}) does not match with samples in "
-                         f"given in 'y' ({len(y)}). "
-                         "Please change your sample axis.")
+      X = np.moveaxis(X, sample_axis, 0) # re-order dims
 
-    # compare number of samples in target with the X array and take the axis
-    # that matches the number of samples:
+    # take number of samples and the feature shape from the first axis:
     else:
+      self.n_samples = dims[0]
+      self.feature_shape = dims[1:]
 
-      # finding out sample axis if not specified and stores axis in params:
-      self.params.sample_axis = self.get_sample_axis(X, sample_axis)
-      self.n_samples = X.shape[self.params.sample_axis]
+    #check whether sample axis is chosen right by comparing number of
+    #samples in y and in given axis
+    if self.n_samples != len(y):
+      raise ValueError("Number of samples given in 'sample_axis' "
+                       f"({self.n_samples}) does not match with samples in "
+                       f"given in 'y' ({len(y)}). "
+                       "Please change your sample axis.")
 
-      #get feature shape:
-      feature_shape = np.take(X, 0, axis = self.params.sample_axis).shape
+    # sets number of features
+    self.n_features = np.prod(np.array(self.feature_shape))
 
-    return feature_shape
+    return X
 
-
-  def get_sample_axis(self, X, sample_axis=None):
+  def _get_sample_axis(self, X, y, sample_axis):
     """
-    Automatically looks for the sample axis if no argument is given in
-    'sample_axis'.
+    Compares input data and targets to match the sample axis. If a sample axis
+    is specified, this will be skipped and the specified axis is returned.
 
     Parameters
     ----------
     X : ndarray
-      The input array.
-    sample_axis : int, optional
-      The dimension of the sample axis. The default is None.
+      Input array.
+    y : ndarray
+      Target array.
+    sample_axis : int
+      The sample dimension.
 
     Returns
     -------
     sample_axis : int
-      The spotted sample axis.
+      The actual sample dimension.
 
     """
-    if not sample_axis:
-      axis = np.argwhere(np.array(X.shape) == self.n_samples)
-      try:
-        sample_axis = int(axis)
-      except:
-        sample_axis = 0
+    if sample_axis:
+      sample_axis = sample_axis
+
     else:
-      sample_axis = self.params.sample_axis
+      # comparison with target values:
+      if y is not None:
+        sample_axis = int(np.argwhere(np.array(X.shape) == len(y)))
+
+      else:
+        sample_axis = sample_axis
 
     return sample_axis
 

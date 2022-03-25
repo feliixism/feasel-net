@@ -47,6 +47,7 @@ class DataContainer:
 
     """
     self.X = X
+
     if y is not None:
       self.y = np.array(y, ndmin=1)
       self.classes = np.unique(y)
@@ -171,6 +172,7 @@ class DataContainer:
     X = np.array(X, ndmin=2)
 
     if y is not None:
+      y = np.array(y, ndmin=1)
       # take number of samples and the feature shape from the sample axis:
       if self.params.sample_axis:
         self.n_samples = X.shape[sample_axis]
@@ -181,8 +183,9 @@ class DataContainer:
         self.n_samples = X.shape[0]
         feature_shape = X.shape[1:]
 
-      #check whether sample axis is chosen right by comparing number of
-      #samples in y and in given axis
+      # check whether sample axis is chosen right by comparing number of
+      # samples in y and in given axis
+
       if self.n_samples != len(y):
         raise ValueError("Number of samples given in 'sample_axis' "
                          f"({self.n_samples}) does not match with samples in "
@@ -261,21 +264,24 @@ class DataContainer:
       X_n = self._scale(X)
 
     else:
-      try:
-        #normalize and transform shape to correct input layer shape
-        NORM = {'standardize': self._standardize,
-                'min_max': self._min_max}
-        X_n = NORM[method](X)
+      if method:
+        try:
+          #normalize and transform shape to correct input layer shape
+          NORM = {'standardize': self._standardize,
+                  'min_max': self._min_max}
+          X_n = NORM[method](X)
 
-      except:
-        raise NameError(f"'{method}' is not implemented as normalization "
-                        "technique. Try 'standardize' or 'min-max'.")
+        except:
+          raise NameError(f"'{method}' is not implemented as normalization "
+                          "technique. Try 'standardize' or 'min-max'.")
+      else:
+        X_n = X
 
     return X_n
 
   def _scale(self, X):
     """
-    Scales the input values X in case that feature scaling parameters are
+    Scales the input values X in case that the feature scaling parameters are
     provided.
 
     Parameters
@@ -295,14 +301,20 @@ class DataContainer:
 
     """
     scale = self._feature_scale
+
     try:
+      # standardization:
       if 'x_bar' in scale.keys():
-        X_n = (X - scale['X_bar']) / scale['s'] # standardization
+        X_n = (X - scale['x_bar']) / scale['s']
+
+      # min-max normalization:
       else:
-        X_n = X * scale['scale'] + scale['offset'] # min-max normalization
+        X_n = X * scale['scale'] + scale['offset']
+
     except:
       raise NotImplementedError('There are no feature scales to scale the '
                                 'input data X.')
+
     return X_n
 
   def _standardize(self, X):
@@ -450,7 +462,3 @@ class DataContainer:
     split = train_test_split(X, y, test_size=test_split, **kwargs)
 
     return split
-
-
-
-

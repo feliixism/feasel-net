@@ -3,25 +3,28 @@ from ..data.metrics import cross_entropy, entropy # metrics for evaluation
 
 # MAPPING:
 # mapping for the different functionalities of the feature selection callback
-_METRIC_MAP = {'accuracy': {'thresh': 0.9},
-               'loss': {'thresh': -1e-3},
-               'val_accuracy': {'thresh': 0.9},
-               'val_loss': {'thresh': -1e-3}}
+_EVAL_MAP = {'accuracy': {'thresh': 0.9},
+             'loss': {'thresh': -1e-3},
+             'val_accuracy': {'thresh': 0.9},
+             'val_loss': {'thresh': -1e-3}}
 
-_METRIC_TYPES = {'accuracy': ['accuracy', 'acc', 'acc.'],
-                 'loss': ['loss'],
-                 'val_accuracy': ['val_accuracy', 'val_acc'],
-                 'val_loss': ['val_loss']}
+_EVAL_TYPES = {'accuracy': ['accuracy', 'acc', 'acc.'],
+               'loss': ['loss'],
+               'val_accuracy': ['val_accuracy', 'val_acc'],
+               'val_loss': ['val_loss']}
 
-_NORM_TYPES = {'min_max': ['min_max', 'min-max', 'min max', 'min-max scale'],
+_NORM_TYPES = {'min-max': ['min_max', 'min-max', 'min max', 'min-max scale'],
                'standardize': ['standardize', 'standard',
                                'z score', 'z-score']}
 
-_LOSS_MAP = {'cross_entropy': cross_entropy,
-             'entropy': entropy}
+_METRIC_MAP = {'cross-entropy': cross_entropy,
+               'entropy': entropy}
 
-_LOSS_TYPES = {'cross_entropy': ['cross_entropy', 'CE'],
-               'entropy': ['entropy']}
+_METRIC_TYPES = {'cross-entropy': ['cross-entropy', 'cross_entropy', 'CE'],
+                 'entropy': ['entropy']}
+
+_DECISION_TYPES = {'average': ['average', 'mean', 'avrg', 'mu'],
+                   'median': ['median', 'med']}
 
 _PRUNING_MAP = {'exponential': {'pruning_rate': 0.2,
                                 'n_prune': None},
@@ -33,20 +36,26 @@ _PRUNING_TYPES = {'exponential': ['exponential', 'exp', 'exp.', 'ex', 'ex.'],
 
 class CallbackParams(BaseParams):
   def __init__(self,
+               # monitoring parameters:
                thresh=None,
                decay=0.,
                d_min=20,
                d_max=500,
-               eval_metric='accuracy',
-               eval_loss='cross_entropy',
+               # evaluation parameters:
                pruning_type='exponential',
                pruning_rate=None,
+               eval_type='accuracy',
+               eval_metric='cross_entropy',
                eval_normalization=None,
                n_features=None,
                compression_rate=None,
                n_prune=None,
                n_samples=None,
                loss_ratio=0.1,
+               decision_metric='average',
+               remove_outliers=True,
+               reset_weights=False,
+               # rationalize=True,
                loocv=True):
     """
     Parameter class for the trigger control of the leave-one-out
@@ -72,19 +81,19 @@ class CallbackParams(BaseParams):
       trigger conditions. If None, it will try to reach the thresholds until
       the end of the actual training process set by the number of epochs in the
       keras model.fit() method. The default is None.
-    eval_metric : str, optional
-      The metric that is monitored. See _METRIC_TYPES for the possible
+    eval_type : str, optional
+      The evaluation type that is monitored. See _EVAL_TYPES for the possible
       arguments. The type of metric determines the default arguments of
-      'thresh' and 'grad'. The default is "accuracy".
-    loss : str, optional
-      The loss function that is exectuted for the evaluation of the features'
-      importances. See _LOSS_TYPES for the possible arguments. The default is
-      "cross_entropy".
+      'thresh' if not specified. The default is 'accuracy'.
+    eval_metric : str, optional
+      The metric function that is exectuted for the evaluation of the features'
+      importances. See _METRIC_TYPES for the possible arguments. The default is
+      'cross-entropy'.
     pruning_type : str, optional
       The type of node reduction for the recursive feature elimination. See
       _PRUNING_TYPES for the possible arguments. The type of pruning determines
       the default arguments of 'pruning_rate' and 'n_prune'. The default is
-      "exponential".
+      'exponential'.
     pruning_rate : float, optional
       The percentage of nodes being eliminated after the update method is
       triggered. The rate is only necessary if 'exponential' is chosen as
@@ -110,6 +119,19 @@ class CallbackParams(BaseParams):
       The minimum ratio of the difference of the first pruned and last kept
       feature and the best overall feature loss that has to be obtained in
       order to trigger pruning (2nd pruning stage). The default is 0.1.
+    remove_outliers : bool, optional
+      If True, it will remove all outliers from the evaluation data. The
+      default is True.
+    decision_metric : str, optional
+      Sets the metric for the decision, which features are to be pruned. The
+      possible options are 'median' or 'average'. The default is 'average'.
+    rationalize : bool, optional
+      If True, it will put the previously pruned feature loss into relation to
+      the feature losses of the currently evaluated features. The default is
+      'True'.
+    reset_weights : bool, optional
+      If True, the weights will be reset at every pruning epoch such that the
+      algorithm is unbiased for the next prune. The default is 'False'.
     loocv : bool, optional
       If True, it will apply the principle of the LOOCV and mask only one
       feature per classification. If False, it will use the inverse LOOCV and
@@ -121,7 +143,7 @@ class CallbackParams(BaseParams):
 
     """
     self.set_metric(eval_metric)
-    self.set_loss(eval_loss)
+    self.set_type(eval_type)
     self.set_pruning_type(pruning_type)
     self.set_threshold(thresh)
     self.set_d_min(d_min)
@@ -133,10 +155,15 @@ class CallbackParams(BaseParams):
     self.set_loss_ratio(loss_ratio)
     self.set_loocv(loocv)
     self.set_decay(decay)
+    self.set_remove_outliers(remove_outliers)
+    self.set_reset_weights(reset_weights)
+    self.set_compression_rate(compression_rate)
+    self.set_decision_metric(decision_metric)
+    # self.set_rationalize(rationalize)
     self.set_normalization(eval_normalization)
 
     self._MAP = {'eval_metric': self.set_metric,
-                 'eval_loss': self.set_loss,
+                 'eval_type': self.set_type,
                  'pruning_type': self.set_pruning_type,
                  'thresh': self.set_threshold,
                  'd_min': self.set_d_min,
@@ -149,6 +176,10 @@ class CallbackParams(BaseParams):
                  'loss_ratio': self.set_loss_ratio,
                  'loocv': self.set_loocv,
                  'decay': self.set_decay,
+                 'decision_metric': self.set_decision_metric,
+                 'remove_outliers': self.set_remove_outliers,
+                 'reset_weights': self.set_reset_weights,
+                 # 'rationalize': self.set_rationalize,
                  'eval_normalization': self.set_normalization}
 
   def __repr__(self):
@@ -183,8 +214,8 @@ class CallbackParams(BaseParams):
   def set_metric(self, metric):
     self.eval_metric = self._get_metric(metric)
 
-  def set_loss(self, loss):
-    self.eval_loss = self._get_loss(loss)
+  def set_type(self, eval_type):
+    self.eval_type = self._get_type(eval_type)
 
   def set_pruning_type(self, pruning_type):
     self.pruning_type = self._get_pruning_type(pruning_type)
@@ -205,7 +236,7 @@ class CallbackParams(BaseParams):
     self.n_features = n_features
 
   def set_compression_rate(self, compression_rate):
-    if not self.n_features:
+    if isinstance(self.n_features, type(None)):
       if compression_rate:
         self.compression_rate = compression_rate
       else:
@@ -228,35 +259,77 @@ class CallbackParams(BaseParams):
   def set_decay(self, decay):
     self.decay = decay
 
+  def set_decision_metric(self, decision_metric):
+    self.decision_metric = self._get_decision_metric(decision_metric)
+
+  def set_remove_outliers(self, remove_outliers):
+    self.remove_outliers = remove_outliers
+
+  def set_reset_weights(self, reset_weights):
+    self.reset_weights = reset_weights
+
+  def set_rationalize(self, rationalize):
+    self.rationalize = rationalize
+
   def set_normalization(self, normalization):
-    self.eval_normalization = normalization
+    if normalization:
+      self.eval_normalization = self._get_normalization(normalization)
+    else:
+      self.eval_normalization = None
 
   # HELPER FUNCTIONS:
-  def _get_metric(self, metric):
+  def _get_type(self, eval_type):
     """
-    Provides different aliases for all possible metrices and searches for
-    the corresponding metric (e.g. 'acc' --> 'accuracy').
+    Provides different aliases for all possible evaluation type and searches
+    for the corresponding metric (e.g. 'acc' --> 'accuracy').
 
     Parameters
     ----------
-    metric : str
-      Metric alias.
+    eval_type : str
+      Type alias.
 
     Raises
     ------
     NameError
-      If metric is not a valid alias.
+      If type is not a valid alias.
 
     Returns
     -------
-    METRIC : str
+    EVAL_TYPE : str
       The proper metric used for the following operations inside the class.
 
     """
-    for METRIC in _METRIC_TYPES:
-      if metric in _METRIC_TYPES[f'{METRIC}']:
-        return metric
-    raise NameError(f"'{metric}' is not a valid metric.")
+    for EVAL_TYPE in _EVAL_TYPES:
+      if eval_type in _EVAL_TYPES[f'{EVAL_TYPE}']:
+        return EVAL_TYPE
+    raise NameError(f"'{eval_type}' is not a valid evaluation type.")
+
+  def _get_decision_metric(self, decision_metric):
+    """
+    Provides different aliases for all possible decision metrics and searches
+    for the corresponding metric (e.g. 'mean' --> 'average').
+
+    Parameters
+    ----------
+    decision_metric : str
+      Decision metric alias.
+
+    Raises
+    ------
+    NameError
+      If decision metric is not a valid alias.
+
+    Returns
+    -------
+    DECISION_METRIC : str
+      The proper decision metric used for the following operations inside the
+      class.
+
+    """
+    for DECISION_METRIC in _DECISION_TYPES:
+      if decision_metric in _DECISION_TYPES[f'{DECISION_METRIC}']:
+        return DECISION_METRIC
+    raise NameError(f"'{decision_metric}' is not a valid decision metric.")
 
   def _get_normalization(self, normalization):
     """
@@ -285,31 +358,31 @@ class CallbackParams(BaseParams):
         return NORM
     raise NameError(f"'{normalization}' is not a valid normalization.")
 
-  def _get_loss(self, loss):
+  def _get_metric(self, eval_metric):
       """
-      Provides different aliases for all possible losses and searches for
-      the corresponding loss (e.g. 'CE' --> 'cross_entropy').
+      Provides different aliases for all possible metrics and searches for
+      the corresponding metric (e.g. 'CE' --> 'cross-entropy').
 
       Parameters
       ----------
-      loss : str
-        Loss alias.
+      eval_metric : str
+        Metric alias.
 
       Raises
       ------
       NameError
-        If loss is not a valid alias.
+        If metric is not a valid alias.
 
       Returns
       -------
-      LOSS : str
-        The proper loss used for the following operations inside the class.
+      METRIC : str
+        The proper metric used for the following operations inside the class.
 
       """
-      for LOSS in _LOSS_TYPES:
-        if loss in _LOSS_TYPES[f'{LOSS}']:
-          return LOSS
-      raise NameError(f"'{loss}' is not a valid loss.")
+      for METRIC in _METRIC_TYPES:
+        if eval_metric in _METRIC_TYPES[f'{METRIC}']:
+          return METRIC
+      raise NameError(f"'{eval_metric}' is not a valid metric.")
 
   def _get_pruning_type(self, pruning_type):
     """
@@ -339,7 +412,7 @@ class CallbackParams(BaseParams):
 
   def _get_thresh(self, thresh):
     """
-    Looks up the metric map for the default threshold value if no other
+    Looks up the evaluation map for the default threshold value if no other
     value is given.
 
     Parameters
@@ -354,7 +427,7 @@ class CallbackParams(BaseParams):
 
     """
     if not thresh:
-      thresh = _METRIC_MAP[f'{self.eval_metric}']['thresh']
+      thresh = _EVAL_MAP[f'{self.eval_type}']['thresh']
     return thresh
 
   def _get_pruning_rate(self, pruning_rate):
@@ -420,8 +493,8 @@ class CallbackParams(BaseParams):
     if type == 'eval_metric':
       return _METRIC_MAP
 
-    elif type == 'eval_loss':
-      return _LOSS_MAP
+    elif type == 'eval_type':
+      return _EVAL_MAP
 
     elif type == 'pruning':
       return _PRUNING_MAP
@@ -449,5 +522,10 @@ class CallbackParams(BaseParams):
       The losses between each data set.
 
     """
-    loss = _LOSS_MAP[f'{self.eval_loss}'](P,Q)
+    if not isinstance(P, type(None)):
+      loss = _METRIC_MAP[f'{self.eval_metric}'](P, Q)
+
+    else:
+      loss = _METRIC_MAP['entropy'](P, Q)
+
     return loss

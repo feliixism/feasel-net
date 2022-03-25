@@ -42,7 +42,10 @@ class DataParams(BaseParams):
 
   # SETTERS:
   def set_normalization(self, normalization):
-    self.normalization = self._get_normalization(normalization)
+    if normalization:
+      self.normalization = self._get_normalization(normalization)
+    else:
+      self.normalization = None
 
   def set_sample_axis(self, sample_axis):
     self.sample_axis = sample_axis

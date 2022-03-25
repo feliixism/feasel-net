@@ -19,6 +19,10 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
   def _pruned(self):
     return self._is_pruned()
 
+  @property
+  def log(self):
+    return self.container.callback.log
+
   def _is_pruned(self):
     """
     Checks whether feature selection algorithm already pruned a feature or not.
@@ -36,7 +40,7 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
       If the feature selection algorithm did not prune anything.
 
     """
-    _pruned = self.container.callback.log._pruned
+    _pruned = self.log._pruned
     if not _pruned:
       raise NotImplementedError("The feature selection did not return "
                                 "anything printworthy.")
@@ -76,27 +80,29 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
 
     """
     # plot content and informative variables
-    log = self.container.callback.log
 
-    n_prunes, n_features = log.weights.shape
-    n_features = log.n_features.astype(int)
+    n_prunes, n_features = self.log.m_k.shape
+    F = self.log.f_n.astype(int)
 
-    epochs = log.pruning_epochs
+    E = self.log.e_prune
 
     # plotting settings for the pruning history
-    ax.plot(epochs, n_features, color = "k", marker = ".")
+    ax.plot(E, F, color = "k", marker = ".")
 
-    ax.set_xlabel("epochs")
+    ax.set_xlabel("epoch")
     ax.set_ylabel("number of features")
 
-    y_max = int(n_features[0]) * 1.05
+    y_max = int(F[0]) * 1.05
 
-    if epochs.size > 2:
+    if self.log.e_stop:
+      np.append(E, self.log.e_stop)
+
+    if E.size > 2:
       # first prune
-      fp = int(epochs[1])
-      ax.axvline(fp, color = "k", ls = "-.")
-      ax.text(epochs[1], y_max/2,
-              f"first prune: $e={fp}$",
+      first = int(E[1])
+      ax.axvline(first, color = "k", ls = "-.")
+      ax.text(E[1], y_max/2,
+              f"first prune: $e={first}$",
               rotation = "vertical",
               horizontalalignment = "center",
               verticalalignment = "center", color = "k",
@@ -104,30 +110,30 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
 
       # last prune
       if not self.container.callback.trigger._converged:
-        lp = int(epochs[-1])
+        last = int(E[-1])
       else:
-        lp = int(epochs[-2])
-      ax.axvline(lp, color = "k", ls = "-.")
-      ax.text(lp, y_max / 2,
-              f"last prune: $e={lp}$",
+        last = int(E[-2])
+      ax.axvline(last, color = "k", ls = "-.")
+      ax.text(last, y_max / 2,
+              f"last prune: $e={last}$",
               rotation = "vertical",
               horizontalalignment = "center",
               verticalalignment = "center", color = "k",
               bbox=dict(facecolor='w'))
 
-    elif epochs.size == 2:
+    elif E.size == 2:
       # only prune
-      op = int(epochs[1])
-      ax.axvline(op, color = "k", ls = "-.")
-      ax.text(op, y_max / 2,
-              f"only prune: $e={op}$",
+      only = int(E[1])
+      ax.axvline(only, color = "k", ls = "-.")
+      ax.text(only, y_max / 2,
+              f"only prune: $e={only}$",
               rotation = "vertical",
               horizontalalignment = "center",
               verticalalignment = "center", color = "k",
               bbox=dict(facecolor='w'))
 
-    ax.set_ylim(0, n_features[0] * 1.05)
-    ax.set_xlim(0, epochs[-1])
+    ax.set_ylim(0, F[0] * 1.05)
+    ax.set_xlim(0, E[-1])
 
     ax.grid(True)
 
@@ -184,13 +190,10 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
     """
     cmap = self.default.im_cmap.reversed() # if reversed cmap: .reversed()
 
-    color = self.c_cmap(4) # orange color of Wistia cmap
+    color = self.c_cmap(4) # orange color
 
-    # plot content and informative variables
-    log = self.container.callback.log
-
-    weights = log.weights
-    n_prunes, n_features = log.weights.shape
+    weights = self.log.m_k
+    n_prunes, n_features = weights.shape
 
     # plotting settings for the mask history
     masks = np.sum(weights, axis = 0, keepdims=True)
@@ -203,13 +206,15 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
       # pcolormesh is used to plot mask history if features are linearly
       # distributed, i.e. equally distributed numbers that can be rescaled:
       if self._check_linearity(features):
-        features_cmesh = np.linspace(features[0], features[-1], len(features)+1)
+        features_cmesh = np.linspace(features[0], features[-1],
+                                     len(features)+1)
         ax.pcolormesh(features_cmesh, np.arange(2), masks, cmap=cmap)
         ax.set_xlim(features[0], features[-1])
         # plot of the remaining features
+
         if highlight:
           ratio = len(features)/len(features_cmesh)
-          ax.bar(features_cmesh[:-1] + 0.5*ratio, last[0]*0.5,
+          ax.bar(features_cmesh[:-1] + 0.5 * ratio, last[0] * 0.5,
                  width=ratio,
                  edgecolor=color, facecolor=color,
                  ls='-', lw=1, label='remaining features')
@@ -221,7 +226,6 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
       else:
         # plots an image with summed up weight matrices:
         ax.imshow(masks, cmap=cmap, aspect="auto", vmin=0, vmax=n_prunes)
-        features = self.default.replace_char(features, '_', ' ')
         # plot of the remaining features
 
         if highlight:
@@ -241,17 +245,13 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
       if highlight:
         ax.bar(features, last[0]*0.5, width=1, edgecolor=color, facecolor=color,
                ls='-', lw=1, label='remaining features')
-
-    # x-axis:
-    ax.set_xlabel("features")
+        ax.legend(loc='upper right')
 
     # y-axis
     ax.set_yticks([])
     ax.set_ylim(0, 0.5)
 
     ax.grid(False)
-    ax.legend(loc='upper right')
-
     return ax
 
   def _check_linearity(self, array):
@@ -297,11 +297,8 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
     """
     cmap = self.default.im_cmap.reversed()
 
-    # plot content and informative variables
-    log = self.container.callback.log
-
-    n_prunes, n_features = log.weights.shape
-    weight_sum = np.sum(log.weights, axis=0)
+    n_prunes, n_features = self.log.m_k.shape
+    weight_sum = np.sum(self.log.m_k, axis=0)
 
     if n_prunes > 6:
       n_ticks = 6
@@ -323,7 +320,7 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
     colorbar.ax.yaxis.set_ticks_position("left")
     colorbar.ax.yaxis.set_label_position("left")
     colorbar.ax.invert_yaxis()
-    colorbar.set_label("times masked $[I/O]$")
+    colorbar.set_label("times masked $[\mathrm{I/O}]$")
 
     return colorbar
 
@@ -461,6 +458,13 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
 
     """
     self._pruned
+    metric = self.container.params.callback.eval_metric
+    norm = self.container.params.callback.eval_normalization
+
+    if metric:
+      label = f'{norm} {metric}'
+    else:
+      label = f'{metric}'
 
     log = self.container.callback.log
 
@@ -468,36 +472,42 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
       pruning_step = np.array([pruning_step-1])
 
     else:
-      pruning_step = np.arange(len(log.loss_f))
+      pruning_step = np.arange(len(log.f_loss))
 
     for i in pruning_step:
       # the masks for each pruning step (applied on second subplot):
-      mask_k = log.mask_k[i+1]
-      mask_p = log.mask_p[i+1]
+      try:
+        mask_k = log.m_k[i+1]
+        mask_p = log.m_p[i+1]
+
+      except:
+        return
+
       colors = [self.default.c_cmap(0), self.default.c_cmap(19)]
 
-      fig = plt.figure(f'Feature Evaluation Losses at {i+1}. Prune '
-                       f'(Epoch: {log.pruning_epochs[i+1]})',
+      fig = plt.figure(f'Feature evaluation losses at {i+1}. Prune '
+                       f'(Epoch: {log.e_prune[i+1]})',
                        figsize=(half_width, 4))
       plt.clf()
 
       # first subplot: box plot for the entropy all samples with each masked
       # feature
       ax1 = fig.add_subplot(211)
-      ax1.boxplot(log.loss_f[i].T,
+      ax1.boxplot(log.f_loss[i].T,
                   labels=np.arange(self.container.n_in))
-      ax1.set_ylabel('normalized cross-entropy')
+      ax1.set_ylabel(label)
       ax1.set_xlim(0.5, self.container.n_in+0.5)
       ax1.tick_params(labelbottom=False)
 
       # second subplot: bar plot with feature selection metric and masks
       ax2 = fig.add_subplot(212, sharex=ax1)
       ax2.bar(np.argwhere(mask_k).squeeze()+1,
-              np.average(log.loss_f[i][mask_k], axis=1),
+              log.f_eval[i][mask_k],
               color=colors[0], label='keep')
       ax2.bar(np.argwhere(mask_p).squeeze()+1,
-              np.average(log.loss_f[i][mask_p],axis=1),
+              log.f_eval[i][mask_p],
               color=colors[1], label='prune')
-      ax2.set_ylabel('average normalized cross-entropy')
+      ax2.set_ylabel(f'{self.container.params.callback.decision_metric} '
+                     f'{label}')
       ax2.set_xlabel('feature')
       ax2.legend(loc='upper right')

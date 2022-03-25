@@ -1,7 +1,7 @@
 from .log import CallbackLog
 
 class CallbackTrigger(CallbackLog):
-  def __init__(self, params, model, layer):
+  def __init__(self, model, layer, params):
     """
     A class that keeps track of the current state of all relevant trigger
     variables. The class variables decide, whether to prune features or
@@ -23,7 +23,7 @@ class CallbackTrigger(CallbackLog):
     None.
 
     """
-    super().__init__(params, model, layer)
+    super().__init__(model, layer, params)
 
   def __repr__(self):
     return ('Trigger container for the Feature Selection Callback\n'
@@ -31,35 +31,40 @@ class CallbackTrigger(CallbackLog):
 
   def initialize(self, logs):
     """
-    Initializes the Log class with all the values after the very first
-    training epoch. This method has to be called after the class
-    instantiation because it needs the model information that, at the time
-    of instantiation, has not been instantiated yet and thus cannot be
-    referred to.
+    Initializes the Log class with all the values after the very first training
+    epoch. This method has to be called after the class instantiation because
+    it needs the model information that, at the time of instantiation, has not
+    been instantiated yet and thus cannot be referred to.
 
     Initializes the following parameters:
-      - value: The current value of the spectated loss or
-          classification accuracy.
+      - value_l: A list of the spectated values (loss or classification
+          accuracy).
+      - value: The current value of the spectated loss or classification
+          accuracy.
+      - gradient_l: A list of the spectated gradients of the corresponding loss
+          values.
+      - gradient: The gradient of the loss value at the current epoch.
+      - window: The window size for the Differentiation Quotient (DQ)
+          calculation.
+      - thresh_l: A list of the threshold for the accuracy or gradient values
+          that have to be surpassed (acc and gradient > thresh).
+      - thresh: The threshold for the accuracy or gradient values that have to
+          be surpassed (acc and gradient > thresh). It adaptively changes over
+          time, if the actual threshold cannot be reached.
+      - epochs: Epoch counter for the consistency criterion.
       - d: The number of epochs since the first time the first trigger
-        condition (surpassing the threshold value several times in a
-          row) has been met in a row.
+          condition (surpassing the threshold value several times in a row) has
+          been met in a row.
       - d_hit: The number of epochs since the last time the first trigger
           condition has been met.
-      - d-prune: The number of epochs since the last time the feature
+      - d_prune: The number of epochs since the last time the feature
           selection algorithm was triggered.
-      - gradient: The gradient of the loss value at the current epoch.
-      - thresh: The threshold of accuracy or loss values that have to be
-          surpassed (acc > thresh and loss < thresh). It adaptively
-          changes over time, if the actual threshold cannot be reached.
-      - grad: The gradient value that has to be surpassed. It adaptively
-          changes over time, if the actual threshold cannot be reached.
-      - epochs: The current epoch of training.
-      - criterion_max: The first stopping criterion (training too long
-          without reaching desired number of features).
-      - criterion_features: The second stopping criterion (reaching
-          desired number of features).
-      - first_prune: Is set True after the first pruning. If it is True,
-          it will allow the adative thresholds and gradients.
+      - _epoch_max: Bool whether max. number of epochs since last prune is
+          reached.
+      - _success: Bool whether desired number of features is obtained.
+      - _prune: Bool whether pruning criterion is met or not.
+      - _pruned: Bool whether pruned for at least one time.
+      - _stop: Bool whether to stop early or not.
 
     Parameters
     ----------
@@ -74,14 +79,18 @@ class CallbackTrigger(CallbackLog):
     # class variables needed for the threshold trigger criteria:
     self.value_l = [] # value list
     self.value = None # current value
+
     self.gradient_l = [] # graident list
     self.gradient = None # current gradient
+
     self.window = 10 # needed for the calculation of the gradient
+
     self.thresh_l = [self.params.thresh] # threshold list
     self.thresh = self.thresh_l[0] # current threshold
 
     # class variables needed for the consistency trigger criteria:
     self.epochs = 0
+
     self.d = 0
     self.d_hit = 0
     self.d_prune = 0
@@ -93,7 +102,6 @@ class CallbackTrigger(CallbackLog):
     self._prune = False
     self._pruned = False
     self._stop = False
-    self._converged = False
 
   def update(self, logs, n_features):
     """
@@ -111,7 +119,7 @@ class CallbackTrigger(CallbackLog):
 
     """
     # stores loss or accuracy value:
-    self.value_l.append(logs[f'{self.params.eval_metric}']) # list of values
+    self.value_l.append(logs[f'{self.params.eval_type}']) # list of values
     self.value = self.value_l[-1] # current value
 
     # stores gradient of loss (or val_loss) value:
@@ -148,19 +156,21 @@ class CallbackTrigger(CallbackLog):
     """
     prune = False
 
-    if self.params.eval_metric in ['accuracy', 'val_accuracy']:
+    if self.params.eval_type in ['accuracy', 'val_accuracy']:
       x = self.value # must surpass threshold if accuracy-based
-    elif self.params.eval_metric in ['loss', 'val_loss']:
+
+    elif self.params.eval_type in ['loss', 'val_loss']:
       x = self.gradient # must surpass threshold if loss-based
 
     # threshold criterion:
     if x and x >= self.thresh:
       self._update_hit(logs)
+
     else:
       self._update_miss(logs)
 
     # consistency crierion:
-    if self.d >= self.params.d_min:
+    if (self.d >= self.params.d_min) and (not self._success):
       prune = True
       self._update_prune(logs)
 
@@ -242,7 +252,7 @@ class CallbackTrigger(CallbackLog):
   def _update_prune(self, logs):
     """
     Updates all other class variables initialized by initialize() after
-    every time the feature callback is triggered (meeting first and second
+    every time the feature callback prunes features (meeting first and second
     criterion).
 
     Parameters
@@ -262,6 +272,7 @@ class CallbackTrigger(CallbackLog):
     self.thresh = self.params.thresh
     self._pruned = True # checks whether it is pruned at least once
     self.epochs += 1
+    self._epoch_max = False
 
   def _get_gradient(self, logs, h):
     """

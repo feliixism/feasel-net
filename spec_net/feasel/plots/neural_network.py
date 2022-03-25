@@ -42,8 +42,7 @@ class NeuralNetworkVisualizer(Base):
     return _trained
 
   # SETTERS:
-
-  def _set_modelname(self, modelname=None):
+  def set_modelname(self, modelname=None):
     """
     Sets the modelname for saving the plots.
 
@@ -61,8 +60,10 @@ class NeuralNetworkVisualizer(Base):
     """
     if not modelname:
       modelname = f"{self.container.name}"
+
     else:
       modelname = modelname
+
     return modelname
 
   def _get_subplot_array(self, n_plots):
@@ -299,7 +300,7 @@ class NeuralNetworkVisualizer(Base):
 
     """
     self._trained
-    y_pred, y_true = self.container.test_model(X, y, model=model)
+    y_pred, y_true = self.container.test(X, y, model=model)
 
     fig = plt.figure('Prediction of a sample', figsize=(half_width, 2))
     fig.clf()
@@ -333,7 +334,7 @@ class NeuralNetworkVisualizer(Base):
                  metric='accuracy',
                  model=None):
     self._trained
-    y_pred, y_true = self.container.test_model(X, y, model=model)
+    y_pred, y_true = self.container.test(X, y, model=model)
 
     METRIC = {'accuracy': self._accuracy,
               'sensitivity': self._sensitivity,
@@ -546,7 +547,7 @@ class NeuralNetworkVisualizer(Base):
       normalize = None
 
     # get true and predicted targets:
-    y_pred, y_true = self.container.test_model(X, y)
+    y_pred, y_true = self.container.test(X, y)
 
     # sk-learn only accepts categorical classes: transformation to categorical
     y_pred = np.argmax(y_pred, axis=1)
@@ -614,7 +615,7 @@ class NeuralNetworkVisualizer(Base):
     """
 
     # get true and predicted targets:
-    y_pred, y_true = self.container.test_model(X, y)
+    y_pred, y_true = self.container.test(X, y)
     TPR, FPR = metrics.ROC(y_pred, y_true)
 
     fig = plt.figure(num='Receiver operating characteristic curve',
