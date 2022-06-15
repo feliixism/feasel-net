@@ -8,7 +8,7 @@ y = np.load(data_path + "labels.npy")
 features = np.load(data_path + "features.npy")
 
 l = []
-for i in range(2):
+for i in range(100):
   FS = DNN(X, y,
            layer_name='Linear',
            n_features=3,
