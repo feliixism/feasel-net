@@ -17,6 +17,14 @@ Please see the links for further information on their software packages and to
 get a grasp of neural networks in general and the constructs used for 
 *SpecNet*.
 
+# Installation
+It is best at the moment to install this as an external package with pip. This can be done by cloning the repository with the following commands:
+```bash
+git clone https://github.tik.uni-stuttgart.de/FelixFischer/FeaSel-Net.git feasel-net
+cd feasel-net
+pip install -e .
+```
+
 ## Sequence of Events
 
 1. Initiallizing Neural Network

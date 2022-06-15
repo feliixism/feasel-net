@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from spec_net.linear_transformation import PCA
 

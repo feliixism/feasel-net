@@ -8,7 +8,7 @@ y = np.load(data_path + "labels.npy")
 features = np.load(data_path + "features.npy")
 
 l = []
-for i in range(100):
+for i in range(2):
   FS = DNN(X, y,
            layer_name='Linear',
            n_features=3,
@@ -80,3 +80,7 @@ def plot():
   FS.plot.pruning_history()
   FS.plot.mask_history(highlight=True)
   FS.plot.input_reduction('both', highlight=True)
+
+plot()
+plt.show(block=True)
+
