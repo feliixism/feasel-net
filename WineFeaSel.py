@@ -80,3 +80,7 @@ def plot():
   FS.plot.pruning_history()
   FS.plot.mask_history(highlight=True)
   FS.plot.input_reduction('both', highlight=True)
+
+plot()
+plt.show(block=True)
+
