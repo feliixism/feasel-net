@@ -84,7 +84,7 @@ class LinearTransformationVisualizer(Base):
     None.
 
     """
-    dark = self.c_cmap(16)
+    dark = 'k'
     bright1 = self.c_cmap(0)
     bright2 = self.c_cmap(2)
 
@@ -94,7 +94,7 @@ class LinearTransformationVisualizer(Base):
     fig.clf()
 
     ax = fig.add_subplot(111)
-    ax.set_ylabel("variance explained [$\%$]")
+    ax.set_ylabel("explained variance [$\%$]")
 
     # gets oev and cev for the first n components:
     oev = self.container.data.oev[0, :self.container.params.build.n_components]
@@ -130,21 +130,21 @@ class LinearTransformationVisualizer(Base):
               marker='.', label='cummulative')
 
     if show_average:
-      ax.axhline(y=avg, color=dark, ls="-.",
+      ax.axhline(y=avg, color=self.c_cmap(16), ls="-.",
                  label='average', zorder = 0)
 
       if type == 'bar' or type == 'both':
         ax.bar(ticks[idx1], oev[idx1], color=bright2)
         for i in idx1:
           ax.text(ticks[i], oev[i] + 1, np.round(oev[i], 1), ha='center',
-                  color=bright2)
+                  color=dark)
         for i in idx2:
           ax.text(ticks[i], oev[i] + 1, np.round(oev[i], 1), ha='center',
-                  color=bright1)
+                  color=dark)
       else:
         for i in ticks:
           ax.text(i, oev[i] + 1, np.round(oev[i], 1), ha='center',
-                  color=bright1)
+                  color=dark)
 
       ax.legend()
 
@@ -183,7 +183,7 @@ class LinearTransformationVisualizer(Base):
 
     self.container.get_loadings()
 
-    fig = plt.figure("Loadings lineplot", figsize=(half_width, 4))
+    fig = plt.figure("Loadings lineplot", figsize=(half_width, 2))
     fig.clf()
     ax = fig.add_subplot(111)
 
@@ -201,12 +201,13 @@ class LinearTransformationVisualizer(Base):
 
     # x-axis:
     ax.set_xlabel('feature')
-    ax.set_xlim(0, self.container.data.n_features-1)
+    ax.set_xlim(self.container.data.features[0],
+                self.container.data.features[-1])
 
     if self.container.data.features.dtype.type == np.str_:
       ax.set_xticks(self.container.data.features)
       ax.set_xticklabels(self.container.data.features,
-                              rotation=-45, ha="left")
+                              rotation=45, ha="right")
 
     ax.legend(loc='upper center', ncol=len(idx))
 
@@ -242,12 +243,12 @@ class LinearTransformationVisualizer(Base):
                             num="Loadings barplot", figsize=(full_width, n*3))
 
     axs = np.array(axs, ndmin=1)
-    for i in components:
-      axs[i].bar(self.container.data.features, self.container.data.loadings[i])
+    for i, c in enumerate(components):
+      axs[i].bar(self.container.data.features, self.container.data.loadings[c])
 
       # y-axis:
-      axs[i].set_ylabel(f"{self.components['name'][i]} "
-                        f"[{np.round(self.container.data.oev[0][i], 1)}\,\%]")
+      axs[i].set_ylabel(f"{self.components['name'][c]} "
+                        f"[{np.round(self.container.data.oev[0][c], 1)}\,\%]")
 
     # x-axis:
     # axs[-1].set_xlabel('feature')
@@ -256,7 +257,7 @@ class LinearTransformationVisualizer(Base):
     if self.container.data.features.dtype.type == np.str_:
       axs[-1].set_xticks(self.container.data.features)
       axs[-1].set_xticklabels(self.container.data.features,
-                              rotation=-45, ha="left")
+                              rotation=45, ha="right")
 
   def _loadings_scatter(self, component_x=1, component_y=2, FOI=None):
     """
@@ -335,7 +336,7 @@ class LinearTransformationVisualizer(Base):
     ax.set_xticks(range(len(features)))
 
     if features.dtype.type == np.str_:
-      ax.set_xticklabels(features, rotation=-45, ha='left')
+      ax.set_xticklabels(features, rotation=45, ha='right')
     else:
       ax.set_xticklabels(features, ha='center')
 
@@ -352,7 +353,7 @@ class LinearTransformationVisualizer(Base):
     # x-axis:
     ax.set_xlim(-0.5, len(height)-0.5)
 
-  def contribution_bars(self, components=[1, 2], show_average=False):
+  def contribution_bars(self, components=[1, 2], show_average=False, crop=None):
     """
     The contribution bars plot is a visualization tool, that sorts the features
     according to their loading values for the given component and plots the
@@ -387,22 +388,27 @@ class LinearTransformationVisualizer(Base):
     height_sum = np.sum(heights, axis=0)
 
     idx = np.flip(np.argsort(np.abs(height_sum)))
+
+    if crop:
+      idx = idx[:crop]
+
     height = height_sum[idx] / np.sum(height_sum) * 100
     heights = heights / np.sum(height_sum) * 100
     features = self.container.data.features[idx]
-    x = np.arange(self.container.data.n_features)
+    x = np.arange(len(idx))
     ax.bar(x, height=np.abs(height), color=dark, alpha=0.25, edgecolor=dark,
            label='sum')
 
     for i, h in enumerate(heights):
       offset = -1/2 * (0.8 + width) + (i + 1) / len(components)*0.8
       ax.bar(x + offset, height=heights[i, idx],
-             label=self.components['name'][components[i]], width=width)
+             label=self.components['name'][components[i]], width=width,
+             color=self.c_cmap(i))
 
     ax.set_xticks(x)
 
     if features.dtype.type == np.str_:
-      ax.set_xticklabels(features, rotation=-45, ha='left')
+      ax.set_xticklabels(features, rotation=45, ha='right')
     else:
       ax.set_xticklabels(features, ha='center')
 
@@ -412,7 +418,7 @@ class LinearTransformationVisualizer(Base):
     ax.legend(loc='upper right')
 
     ax.set_ylim(0, height[0] * 1.05)
-    ax.set_ylabel("conribution [$\%$]")
+    ax.set_ylabel("contribution [$\%$]")
 
     ax.set_xlim(-0.5, x[-1] + 0.5)
 
@@ -636,7 +642,7 @@ class LinearTransformationVisualizer(Base):
     None.
 
     """
-    if X:
+    if X is not None:
       target = y
     else:
       target = self.container.data.y_train
@@ -667,6 +673,7 @@ class LinearTransformationVisualizer(Base):
 
     else:
       ax = fig.add_subplot(111)
+      ax1, ax2 = None, None
 
     if self.component_type == 'PC':
       self.scores_pca(ax, scores, target, component_x, component_y,
@@ -762,8 +769,8 @@ class LinearTransformationVisualizer(Base):
             projection_0 = scale_0 * exp_0
             projection_1 = scale_1 * exp_1
 
-            projection_axes[1].plot(X, projection_0)
-            projection_axes[0].plot(projection_1, X)
+            projection_axes[1].plot(X, projection_0, color=color)
+            projection_axes[0].plot(projection_1, X, color=color)
 
           ax.legend(loc='upper right')
 
@@ -808,11 +815,13 @@ class LinearTransformationVisualizer(Base):
 
     colors_l = []
 
+    C = [0, 12, 4, 16, 2, 14, 6, 18]
     for i, c in enumerate(self.container.data.classes):
       mask = np.argwhere(target == c).flatten()
       S = scores[mask][:, np.array([x, y])]
 
       color = self.c_cmap(i * 4)
+      color = self.c_cmap(C[i])
       colors_l.append(color)
       cov = np.cov(S.T)
       mu = np.average(S, axis=0)
@@ -838,8 +847,8 @@ class LinearTransformationVisualizer(Base):
         projection_0 = scale_0 * exp_0
         projection_1 = scale_1 * exp_1
 
-        projection_axes[1].plot(X, projection_0)
-        projection_axes[0].plot(projection_1, X)
+        projection_axes[1].plot(X, projection_0, color=color)
+        projection_axes[0].plot(projection_1, X, color=color)
 
     # get decision boundary and confidence levels
     if decision_boundaries:

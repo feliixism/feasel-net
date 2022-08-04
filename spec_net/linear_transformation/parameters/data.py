@@ -2,7 +2,8 @@ from .base import BaseParams
 
 _NORM_TYPES = {'min_max': ['min_max', 'min-max', 'min max', 'min-max scale'],
                'standardize': ['standardize', 'standard',
-                               'z score', 'z-score']}
+                               'z score', 'z-score'],
+               'None': [None]}
 
 class DataParams(BaseParams):
   def __init__(self,

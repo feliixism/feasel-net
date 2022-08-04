@@ -311,6 +311,8 @@ class DataContainer:
       else:
         X_n = X * scale['scale'] + scale['offset']
 
+      X_n = np.nan_to_num(X_n)
+
     except:
       raise NotImplementedError('There are no feature scales to scale the '
                                 'input data X.')

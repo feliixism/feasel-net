@@ -183,7 +183,7 @@ class ModelContainer:
     """
     self.params.train.set_batch_size(batch_size)
 
-  def set_validation_split(self, validation_split):
+  def set_test_split(self, validation_split):
     """
     Sets ratio between validation and training data.
 
@@ -197,7 +197,7 @@ class ModelContainer:
     None.
 
     """
-    self.params.train.set_validation_split(validation_split)
+    self.params.train.set_test_split(validation_split)
 
   def set_dropout_rate(self, dropout_rate):
     """
@@ -461,7 +461,7 @@ class ModelContainer:
     return map
 
   # MODEL METHODS:
-  def compile_model(self):
+  def compile(self):
     """
     Compiles the generically built model.
 
@@ -479,7 +479,7 @@ class ModelContainer:
                        loss=self.params.train.loss,
                        metrics=[self.params.train.metric])
 
-  def fit_model(self):
+  def fit(self):
     """
     Fits the generically built model.
 
@@ -489,7 +489,7 @@ class ModelContainer:
       Training history of the neural network.
 
     """
-    self.compile_model()
+    self.compile()
     params = self.params.train
 
     X = self.data.X_train
@@ -506,7 +506,7 @@ class ModelContainer:
   def train(self):
     """
     Trains the generically built model. Same functionality as
-    'fit_model()'.
+    'fit()'.
 
     Returns
     -------
@@ -516,13 +516,41 @@ class ModelContainer:
     """
     if isinstance(self.history, type(None)):
       self.model = self.get_model()
-      self.compile_model()
-      self.history = self.fit_model()
+      self.compile()
+      self.history = self.fit()
     return self.history
 
   def test(self, X_test, y_test=None, model=None):
     """
-    Tests the generically built model.
+    Tests the generically built model and returns probabilities.
+
+    Parameters
+    ----------
+    X_test : ndarray
+      The test dataset.
+    y_test : ndarray, optional
+      The label dataset. The default is None.
+    model : Model, optional
+      The model that is tested. The default is None.
+
+    Returns
+    -------
+    y_pred : ndarray
+      The probabilities.
+
+    """
+    if model is None:
+      model = self.model
+
+    X_test, y_test = self.data.prepare(X_test, y_test)
+    y_true = self.encode(y_test)
+    y_pred = model.predict(X_test)
+
+    return y_pred, y_true
+
+  def predict(self, X_test, y_test=None, model=None):
+    """
+    Tests the generically built model and returns classes.
 
     Parameters
     ----------
@@ -545,6 +573,13 @@ class ModelContainer:
     X_test, y_test = self.data.prepare(X_test, y_test)
     y_true = self.encode(y_test)
     y_pred = model.predict(X_test)
+
+    y_p = np.zeros(y_pred.shape)
+
+    for i, j in enumerate(np.argmax(y_pred, axis=1)):
+      y_p[i,j] = 1
+
+    y_pred = y_p
 
     return y_pred, y_true
 

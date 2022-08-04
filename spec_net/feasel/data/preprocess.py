@@ -91,7 +91,8 @@ def one_hot(array):
   l_indices = get_indices(array, type='one-hot') # provides a list of indices
 
   # chek if one-hot already:
-  if (array.ndim != 2) and (np.unique(array) != [0,1]):
+  if (array.ndim != 2) and not np.array_equal(np.unique(array),
+                                              np.array([0,1])):
     # creates the empty one-hot encoded array:
     one_hot = np.zeros([len(array), len(l_indices)])
     for i, indices in enumerate(l_indices):
@@ -239,9 +240,12 @@ def min_max(X, axis=-1, a_max=1., a_min=0., return_scale=False):
 
     if return_scale:
       scale = {'scale': scale, 'offset': offset}
+      X_min_max = np.nan_to_num(X_min_max)
       return X_min_max, scale
   else:
     X_min_max = X
+
+  X_min_max = np.nan_to_num(X_min_max)
 
   return X_min_max
 
@@ -270,16 +274,17 @@ def standardize(X, axis = -1, return_scale=False):
 
   """
   if len(X) > 1:
-    x_bar = np.mean(X, axis=axis, keepdims=True) # arithmetic mean
-    s = np.std(X, axis=axis, keepdims=True) # standard deviation
+    x_bar = np.nanmean(X, axis=axis, keepdims=True) # arithmetic mean
+    s = np.nanstd(X, axis=axis, keepdims=True) # standard deviation
 
     X_z = (X - x_bar) / s
+    X_z = np.nan_to_num(X_z)
 
     if return_scale:
       scale = {'x_bar': x_bar, 's': s}
       return X_z, scale
 
   else:
-    X_z = X
+    X_z = np.nan_to_num(X)
 
   return X_z
