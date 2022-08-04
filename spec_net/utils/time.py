@@ -21,5 +21,7 @@ def get_timestamp():
     timestamp = date + "_" + clock
     return timestamp
 
-timestamp = get_timestamp()
+def time_ns():
+  return time.time()
 
+timestamp = get_timestamp()

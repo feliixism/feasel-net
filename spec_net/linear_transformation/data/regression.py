@@ -254,9 +254,12 @@ class DataContainer:
     else:
       try:
         #normalize and transform shape to correct input layer shape
-        NORM = {'standardize': self._standardize,
-                'min_max': self._min_max}
-        X_n = NORM[method](X)
+        if method != 'None':
+          NORM = {'standardize': self._standardize,
+                  'min_max': self._min_max}
+          X_n = NORM[method](X)
+        else:
+          X_n = X
 
       except:
         raise NameError(f"'{method}' is not implemented as normalization "

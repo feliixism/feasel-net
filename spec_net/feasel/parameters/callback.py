@@ -56,7 +56,9 @@ class CallbackParams(BaseParams):
                remove_outliers=True,
                reset_weights=False,
                # rationalize=True,
-               loocv=True):
+               loocv=True,
+               accelerate=False,
+               release=False):
     """
     Parameter class for the trigger control of the leave-one-out
     cross-validation (LOOCV) based feature selection callback.
@@ -161,6 +163,8 @@ class CallbackParams(BaseParams):
     self.set_decision_metric(decision_metric)
     # self.set_rationalize(rationalize)
     self.set_normalization(eval_normalization)
+    self.set_accelerate(accelerate)
+    self.set_release(release)
 
     self._MAP = {'eval_metric': self.set_metric,
                  'eval_type': self.set_type,
@@ -180,7 +184,9 @@ class CallbackParams(BaseParams):
                  'remove_outliers': self.set_remove_outliers,
                  'reset_weights': self.set_reset_weights,
                  # 'rationalize': self.set_rationalize,
-                 'eval_normalization': self.set_normalization}
+                 'eval_normalization': self.set_normalization,
+                 'accelerate': self.set_accelerate,
+                 'release': self.set_release}
 
   def __repr__(self):
     return ('Parmeter container for the Feature Selection Callback\n'
@@ -276,6 +282,12 @@ class CallbackParams(BaseParams):
       self.eval_normalization = self._get_normalization(normalization)
     else:
       self.eval_normalization = None
+
+  def set_accelerate(self, accelerate):
+    self.accelerate = accelerate
+
+  def set_release(self, release):
+    self.release = release
 
   # HELPER FUNCTIONS:
   def _get_type(self, eval_type):

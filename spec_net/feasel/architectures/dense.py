@@ -80,7 +80,7 @@ class DenseDNN(ModelContainer):
     None.
 
     """
-    self.n_layers = n_layers
+    self.params.build.n_layers = n_layers
     self.get_architecture()
 
   def get_block(self, x, n_nodes, n_layers, architecture_type):
@@ -152,7 +152,7 @@ class DenseDNN(ModelContainer):
                   name=f'Dropout{idx}')(x)
     return x
 
-  def get_block_exp_down(self, x, n_nodes = None, n_layers = 3):
+  def get_block_exp_down(self, x, n_nodes=None, n_layers=3):
     """
     Generates a generic neural network architecture with an exponential
     decline of layer nodes. The first layer defines the number of nodes
@@ -193,7 +193,7 @@ class DenseDNN(ModelContainer):
 
     return x
 
-  def get_block_down(self, x, n_nodes = None, n_layers = 3):
+  def get_block_down(self, x, n_nodes=None, n_layers=3):
     """
     Generates a generic neural network architecture with a linear
     decline of layer nodes. The first layer defines the number of nodes
@@ -221,15 +221,17 @@ class DenseDNN(ModelContainer):
     if n_nodes is None:
       n_nodes = self.n_in
 
-    for i in range(1, n_layers+1):
-      x = Dense(int(np.round(n_nodes / (2 * i), 0)),
+    n_out = self.data.n_classes
+
+    for i in range(0, n_layers):
+      x = Dense(int(n_nodes - (n_nodes - n_out) / n_layers * i),
                 activation=self.params.train.activation,
                 name=f"Dense{i}")(x)
       x = self.get_dropout(x, i)
 
     return x
 
-  def get_block_const(self, x, n_nodes = None, n_layers = 3):
+  def get_block_const(self, x, n_nodes=None, n_layers=3):
     """
     Generates a generic neural network architecture with contant numbers
     of layer nodes. The first layer defines the number of nodes
@@ -265,7 +267,7 @@ class DenseDNN(ModelContainer):
 
     return x
 
-  def get_block_up_down(self, x, n_nodes = None, n_layers = 3):
+  def get_block_up_down(self, x, n_nodes=None, n_layers=3):
     """
     Generates a generic neural network architecture with a linear increase
     and decline of layer nodes afterwards. The first layer defines the
@@ -294,30 +296,28 @@ class DenseDNN(ModelContainer):
     if n_nodes is None:
       n_nodes = self.n_in
 
-    if n_layers%2 == 0:
-      n_layers1, n_layers2 = int(n_layers / 2), int(n_layers / 2)
-    else:
-      n_layers1 = int((n_layers + 1) / 2)
-      n_layers2 = int((n_layers - 1) / 2)
+    n_layers1 = int(np.floor(n_layers / 2))
+    n_layers2 = int(np.ceil(n_layers / 2))
 
-    for i in range(1, n_layers1 + 1):
-      x = Dense(n_nodes * (2*i),
+    for i in range(1, n_layers1 + 2):
+      x = Dense(int(n_nodes + n_nodes * i),
                 activation=self.params.train.activation,
                 name=f"Dense{i}")(x)
       x = self.get_dropout(x, i)
 
-    n_nodes = n_nodes * (2*i)
+    n_peak = n_nodes + n_nodes * i
+    n_out = self.data.n_classes
 
-    for j in range(1, n_layers2 + 1):
+    for j in range(n_layers2 - 1):
       i += 1
-      x = Dense(int(n_nodes / (2*j)),
+      x = Dense(int(n_peak - (n_peak - n_out) / n_layers2 * (j+1)),
                 activation=self.params.train.activation,
                 name=f"Dense{i}")(x)
       x = self.get_dropout(x, i)
 
     return x
 
-  def fit_model(self):
+  def fit(self):
     """
     Fits the generically built model.
 

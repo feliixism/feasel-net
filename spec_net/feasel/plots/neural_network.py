@@ -566,14 +566,16 @@ class NeuralNetworkVisualizer(Base):
     plt.clf()
 
     ax = fig.add_subplot(111)
-    ax.imshow(cm, cmap=self.default.im_cmap, vmin=0, vmax=100)
+    ax.imshow(cm, cmap='Blues', vmin=0, vmax=100)
     for i in range(cm.shape[0]):
       for j in range(cm.shape[1]):
         val = np.round(cm[i, j], 1)
         if val < 50:
-          ax.text(j, i, f'{val}\,\%', color='k', ha='center', va='center')
+          ax.text(j, i, f'{val}', color='k', ha='center', va='center',
+                  size='small')
         else:
-          ax.text(j, i, f'{val}\,\%', color='white', ha='center', va='center')
+          ax.text(j, i, f'{val}', color='white', ha='center', va='center',
+                  size='small')
 
     # x-axis:
     ax.set_xticks(range(len(classes)), classes,

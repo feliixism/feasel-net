@@ -112,6 +112,7 @@ class CallbackLog:
     self.f_n = np.sum(ones, keepdims=True) # list of number of features
     self.f_loss = None # loss array for features and samples
     self.f_eval = [] # loss for feature evaluation
+    self.t = []
 
     self._pruned = False
 

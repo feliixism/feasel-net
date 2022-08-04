@@ -193,6 +193,7 @@ class ModelContainer:
     # select q most important components:
     p = self.data.n_features
     I = np.identity(p)
+    n_c = self.params.build.n_components
 
     self.data.loadings = I * np.sqrt(evals) @ evecs.T
 
@@ -210,26 +211,30 @@ class ModelContainer:
     if isinstance(self.data.loadings, type(None)):
       self.get_loadings()
 
+    n = self.params.build.n_components
+
     if X_test is None:
       X_test = self.data.X_train
-      scores = (self.data.loadings @ X_test.T).T
+
+      scores = (self.data.loadings[:n] @ X_test.T).T
+      # scores = (self.data.evecs.T @ X_test.T).T
       self.data.scores = scores
 
     else:
       if X_test.shape[1:] != self.data.X_train.shape[1:]:
         X_test = X_test.T
 
-      scale = self.data._feature_scale
+      # scale = self.data._feature_scale
 
-      # standardization:
-      if 'x_bar' in scale.keys():
-        X_test = (X_test - scale['x_bar']) / scale['s']
+      # # standardization:
+      # if 'x_bar' in scale.keys():
+      #   X_test = (X_test - scale['x_bar']) / scale['s']
 
-      # min-max normalization:
-      elif 'offset' in scale.keys():
-        X_test = scale['scale'] * X_test + scale['offset']
+      # # min-max normalization:
+      # elif 'offset' in scale.keys():
+      #   X_test = scale['scale'] * X_test + scale['offset']
 
-      scores = (self.data.loadings @ X_test.T).T
+      scores = (self.data.loadings[:n] @ X_test.T).T
 
     return scores
 

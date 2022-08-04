@@ -109,7 +109,7 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
               bbox=dict(facecolor='w'))
 
       # last prune
-      if not self.container.callback.trigger._converged:
+      if not self.container.callback.trigger._success:
         last = int(E[-1])
       else:
         last = int(E[-2])
@@ -188,7 +188,7 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
       The axes where the mask history is plotted.
 
     """
-    cmap = self.default.im_cmap.reversed() # if reversed cmap: .reversed()
+    cmap = plt.get_cmap('Blues').reversed() #self.default.im_cmap.reversed() # if reversed cmap: .reversed()
 
     color = self.c_cmap(4) # orange color
 
@@ -229,14 +229,17 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
         # plot of the remaining features
 
         if highlight:
-          ax.bar(features, last[0]*0.5, width=1, edgecolor=color, facecolor=color,
+          ax.bar(features, last[0]*0.5, width=1, edgecolor='k', facecolor='k',
                  ls='-', lw=1, label='remaining features')
 
         # enables 10 ticks in x-axis with strings
         ratio = int(n_features / 10)
-
-        ax.set_xticks(np.arange(len(features))[::ratio])
-        ax.set_xticklabels(features[::ratio], rotation=-45, ha='left')
+        try:
+          ax.set_xticks(np.arange(len(features))[::ratio])
+          ax.set_xticklabels(features[::ratio], rotation=45, ha='right')
+        except:
+          ax.set_xticks(np.arange(len(features)))
+          ax.set_xticklabels(features, rotation=45, ha='right')
 
     else:
       features = np.arange(len(masks[0]))
@@ -440,7 +443,7 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
     ax1.set_xlim(x[0], x[-1])
     ax1.set_ylabel(f'{params.eval_metric}')
 
-  def feature_entropy(self, pruning_step=None):
+  def feature_entropy(self, pruning_step=None, show_samples=False):
     """
     Generates a bar and box plot where the decision metrics for the feature
     pruning are shown.
@@ -458,13 +461,13 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
 
     """
     self._pruned
-    metric = self.container.params.callback.eval_metric
+    metric = self.container.params.callback.decision_metric
     norm = self.container.params.callback.eval_normalization
 
-    if metric:
-      label = f'{norm} {metric}'
+    if norm:
+      label = r'$\mathcal{I}_f$' + f'({norm})'
     else:
-      label = f'{metric}'
+      label = r'$\mathcal{I}_f$'
 
     log = self.container.callback.log
 
@@ -483,31 +486,41 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
       except:
         return
 
-      colors = [self.default.c_cmap(0), self.default.c_cmap(19)]
+      colors = [self.default.c_cmap(0), self.default.c_cmap(6)]
 
+      if show_samples:
+        figsize = (half_width, 4)
+      else:
+        figsize = (half_width, 2)
       fig = plt.figure(f'Feature evaluation losses at {i+1}. Prune '
-                       f'(Epoch: {log.e_prune[i+1]})',
-                       figsize=(half_width, 4))
+                       f'(Epoch: {log.e_prune[i+1]})', figsize=figsize)
       plt.clf()
 
       # first subplot: box plot for the entropy all samples with each masked
       # feature
-      ax1 = fig.add_subplot(211)
-      ax1.boxplot(log.f_loss[i].T,
+      if show_samples:
+        ax1 = fig.add_subplot(211)
+        ax1.boxplot(log.f_loss[i].T,
                   labels=np.arange(self.container.n_in))
-      ax1.set_ylabel(label)
-      ax1.set_xlim(0.5, self.container.n_in+0.5)
-      ax1.tick_params(labelbottom=False)
+        ax1.set_ylabel(label)
+        ax1.set_xlim(0.5, self.container.n_in+0.5)
+        ax1.tick_params(labelbottom=False)
 
-      # second subplot: bar plot with feature selection metric and masks
-      ax2 = fig.add_subplot(212, sharex=ax1)
+        # second subplot: bar plot with feature selection metric and masks
+        ax2 = fig.add_subplot(212, sharex=ax1)
+
+      else:
+        ax2 = fig.add_subplot(111)
       ax2.bar(np.argwhere(mask_k).squeeze()+1,
               log.f_eval[i][mask_k],
               color=colors[0], label='keep')
       ax2.bar(np.argwhere(mask_p).squeeze()+1,
               log.f_eval[i][mask_p],
               color=colors[1], label='prune')
-      ax2.set_ylabel(f'{self.container.params.callback.decision_metric} '
-                     f'{label}')
-      ax2.set_xlabel('feature')
+      if not isinstance(self.container.features, type(None)):
+        ax2.set_xticks(np.arange(len(self.container.features))+1)
+        ax2.set_xticklabels(self.container.features, rotation=45, ha='right')
+      ax2.set_ylabel(f'{label}')
+      if norm == 'min-max':
+        ax2.set_ylim(0,1)
       ax2.legend(loc='upper right')

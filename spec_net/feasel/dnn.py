@@ -1,7 +1,7 @@
 from tensorflow.keras.layers import Input, Dense
 import numpy as np
 
-from .tfcustom.callbacks import FeatureSelection
+from .tfcustom.callbacks2 import FeatureSelection
 from .tfcustom.layers import LinearPass
 from .parameters import Params
 
@@ -118,7 +118,7 @@ class FeaselDNN(DenseDNN):
 
     x = LinearPass(name="Linear")(x) # layer for the feature selection
 
-    x = self.get_block(x, n_nodes=None, n_layers=self.n_layers,
+    x = self.get_block(x, n_nodes=None, n_layers=self.params.build.n_layers,
                        architecture_type=self.params.build.architecture_type)
 
     self.output_layer = Dense(self.data.n_classes,
@@ -146,7 +146,7 @@ class FeaselDNN(DenseDNN):
 
     return n_features
 
-  def fit_model(self):
+  def fit(self):
     """
     The standard model.fit() method by keras with the feature selection
     callback integrated.
@@ -161,13 +161,16 @@ class FeaselDNN(DenseDNN):
       self.callback = self.get_callback(layer_name=self.layer_name,
                                         n_features=self.n_features,
                                         **self.params.callback.dictionary)
+    if not isinstance(self.data.X_test, type(None)):
+      validation_data = (self.data.X_test, self.data.y_test)
+    else:
+      validation_data = None
 
     history = self.model.fit(x=self.data.X_train, y=self.data.y_train,
                              epochs=self.params.train.epochs,
                              shuffle=False, # data is shuffled already
                              batch_size=self.params.train.batch_size,
-                             validation_data=(self.data.X_test,
-                                              self.data.y_test),
+                             validation_data=validation_data,
                              callbacks=[self.callback],
                              verbose=False) # only FS log is shown
 
