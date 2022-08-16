@@ -1,9 +1,13 @@
 import numpy as np
-from spec_net.linear_transformation import LDA
+from feasel.linear import LDA
+from feasel.data.normalize import min_max
+
 data_path = "data/wine/npy/"
 X = np.load(data_path + "data.npy")
 y = np.load(data_path + "labels.npy")
 features = np.load(data_path + "features.npy")
+
+X = min_max(X, axis=0)
 
 LD = LDA(X, y, features=features,
          n_components=2,
