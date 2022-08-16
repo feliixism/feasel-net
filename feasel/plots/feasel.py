@@ -466,7 +466,7 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
     if not self._pruned:
       return
 
-    norm = self.params.eval_normalization
+    norm = self.params.normalization
     features = self.data.features
 
     if norm:

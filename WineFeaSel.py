@@ -16,16 +16,14 @@ FS = FSDNN(X, y,
             # 'data', 'train', 'build' or 'callback' parameters can also be set
             # within dictionaries:
             callback={'eval_type': 'accuracy',
-                    'd_min': 20,
-                    'd_max': 100,
-                    'n_samples': None,
-                    'thresh': 0.98,
-                    # 'decay': 0.0005,
-                    'pruning_type': 'exp.',
-                    'scale': True,
-                    'eval_normalization': 'min-max',
-                    # 'remove_outliers': True,
-                    },
+                      'd_min': 20,
+                      'd_max': 100,
+                      'n_samples': None,
+                      'thresh': 0.98,
+                      'pruning_type': 'exp.',
+                      'scale': True,
+                      'normalization': 'min-max',
+                      },
 
             features=features,
             architecture_type='exp-down',
@@ -36,7 +34,7 @@ FS = FSDNN(X, y,
 # sets some parameters outside of class instantiation:
 FS.set_n_layers(3)
 FS.set_learning_rate(0.001)
-FS.set_batch_size(32)
+FS.set_batch_size(16)
 FS.set_epochs(1000)
 
 # FS.compile_model()
