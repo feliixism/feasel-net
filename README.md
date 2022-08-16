@@ -1,5 +1,5 @@
-# SpecNet
-*SpecNet* is a python package that enables feature selection algorithms embedded 
+# FeaSel-Net
+*FeaSel-Net* is a python package that enables feature selection algorithms embedded 
 in a neural network architecture. It combines a leave-one-out cross-validation 
 (LOOCV) type of feature selection algorithm with recursive pruning of the input 
 nodes, such that only the most relevant nodes with the richest information are 
@@ -15,7 +15,7 @@ The package is an extension for the [keras](https://www.keras.io) and
 [tensorflow](https://www.tensorflow.org/) libraries.
 Please see the links for further information on their software packages and to 
 get a grasp of neural networks in general and the constructs used for 
-*SpecNet*.
+*FeaSel-Net*.
 
 # Installation
 It is best at the moment to install this as an external package with pip. This can be done by cloning the repository with the following commands:
