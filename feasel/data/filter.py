@@ -1,3 +1,8 @@
+"""
+feasel.data.filter
+==================
+"""
+
 from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
 

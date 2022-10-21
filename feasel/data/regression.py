@@ -1,7 +1,12 @@
+"""
+feasel.data.regression
+======================
+"""
+
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-from ..parameters import data
+from ..parameter import data
 from . import preprocess as prep
 
 class Linear:
@@ -69,8 +74,9 @@ class Linear:
     self.oev = None
     self.cev = None
     self.contribution = None
+    self.importance = None
 
-    self.params = data.Linear(**kwargs)
+    self.params = data.DataParamsLinear(**kwargs)
 
     for key in kwargs:
       if key in self.params.__dict__.keys():

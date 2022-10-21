@@ -1,3 +1,8 @@
+"""
+feasel.nn.tfcustom.utils.callback.log
+=====================================
+"""
+
 import numpy as np
 
 class CallbackLog:

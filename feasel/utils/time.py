@@ -1,3 +1,8 @@
+"""
+feasel.utils.time
+=================
+"""
+
 import functools
 import time
 

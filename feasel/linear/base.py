@@ -1,8 +1,13 @@
+"""
+feasel.linear.base
+==================
+"""
+
 import numpy as np
 
 from ..data import regression
-from ..parameters import ParamsLinear
-from ..plots import LinearTransformationVisualizer as Visualizer
+from ..parameter import ParamsLinear
+from ..plot import LinearTransformationVisualizer as Visualizer
 from ..utils.time import get_timestamp
 
 class ModelContainer:
@@ -193,11 +198,17 @@ class ModelContainer:
     # select q most important components:
     p = self.data.n_features
     I = np.identity(p)
-    n_c = self.params.build.n_components
 
-    self.data.loadings = I * np.sqrt(evals) @ evecs.T
 
-  def get_scores(self, X_test=None):
+    method = 'loadings'
+    #many sources claim that loadings are just the evecs:
+    if method=='evecs':
+      self.data.loadings = evecs.T
+    elif method=='loadings':
+      self.data.loadings = I * np.sqrt(evals) @ evecs.T
+
+
+  def get_scores(self, X_test):
     """
     Calculates the values of the original features projected into the new
     latent variable space described by the corresponding principal
@@ -211,30 +222,9 @@ class ModelContainer:
     if isinstance(self.data.loadings, type(None)):
       self.get_loadings()
 
-    n = self.params.build.n_components
+    q = self.params.build.n_components
 
-    if X_test is None:
-      X_test = self.data.X_train
-
-      scores = (self.data.loadings[:n] @ X_test.T).T
-      # scores = (self.data.evecs.T @ X_test.T).T
-      self.data.scores = scores
-
-    else:
-      if X_test.shape[1:] != self.data.X_train.shape[1:]:
-        X_test = X_test.T
-
-      # scale = self.data._feature_scale
-
-      # # standardization:
-      # if 'x_bar' in scale.keys():
-      #   X_test = (X_test - scale['x_bar']) / scale['s']
-
-      # # min-max normalization:
-      # elif 'offset' in scale.keys():
-      #   X_test = scale['scale'] * X_test + scale['offset']
-
-      scores = (self.data.loadings[:n] @ X_test.T).T
+    scores = (self.data.loadings[:q] @ X_test.T).T
 
     return scores
 
@@ -342,5 +332,34 @@ class ModelContainer:
       self.data.contribution = np.empty(self.data.loadings.shape)
 
       for i in range(len(self.data.loadings)):
-        self.data.contribution[i] = (np.abs(self.data.evecs[i])
+        self.data.contribution[i] = (np.abs(self.data.loadings[i])
                                      / np.sum(np.abs(self.data.loadings[i])))
+
+  def get_importance(self):
+    """
+    Calculates the overall importance of each feature in percent.
+
+    Returns
+    -------
+    None.
+
+    """
+    if not isinstance(self.data.importance, np.ndarray):
+      if not isinstance(self.data.loadings, np.ndarray):
+        self.get_loadings()
+
+      self.data.importance = np.abs(self.data.loadings)
+
+  def prune(self, n_features):
+    if isinstance(self.data.importance, type(None)):
+      self.get_importance()
+    weighted_importance = self.data.importance
+
+    importance = np.sum(weighted_importance[:self.q], axis=0)
+    importance = importance / np.sum(importance)
+    mask = np.flip(np.argsort(importance))[:n_features]
+
+    X = self.data.X[:, mask]
+    y = self.data.y
+    features = self.data.features[mask]
+    return X, y, features

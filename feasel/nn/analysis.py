@@ -1,3 +1,10 @@
+"""
+feasel.nn.analysis
+==================
+
+Work to be done...
+"""
+
 import numpy as np
 
 class FeaSelAnalysis:

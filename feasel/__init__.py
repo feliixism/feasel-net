@@ -1,9 +1,9 @@
+__version__ = '0.0.8'
+
 from . import data
 from . import nn
 from . import linear
-from . import parameters
-from . import plots
+from . import parameter
+from . import plot
 from . import utils
 
-__version__ = '0.0.8'
-print(f"This code is based on FeaSelNet {__version__}.")

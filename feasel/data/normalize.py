@@ -1,3 +1,8 @@
+"""
+feasel.data.normalize
+=====================
+"""
+
 import numpy as np
 
 def min_max(X, axis=-1, a_max=1., a_min=0., return_scale=False):

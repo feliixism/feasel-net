@@ -1,3 +1,8 @@
+"""
+feasel.data.metrics
+===================
+"""
+
 import numpy as np
 
 # LOSSES:

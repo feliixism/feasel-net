@@ -1,3 +1,8 @@
+"""
+feasel.nn.tfcustom.utils.callback.trigger
+=========================================
+"""
+
 from .log import CallbackLog
 
 class CallbackTrigger(CallbackLog):

@@ -1,3 +1,8 @@
+"""
+feasel.nn.tfcustom.callbacks
+============================
+"""
+
 # TODOs:
 # - Implementation of the ability for using callback in conv layers
 
@@ -7,7 +12,7 @@ from tensorflow.keras.callbacks import Callback # inherits from keras callbacks
 from tensorflow.keras.utils import Progbar
 
 # callback information variables in different containers:
-from ...parameters import callback # parameter container
+from ...parameter import callback # parameter container
 from ...data import preprocess as prep
 from ...data import normalize
 from ...utils import time
@@ -16,47 +21,54 @@ from ...utils import time
 from .utils.callback import CallbackLog, CallbackTrigger
 
 class FeatureSelection(Callback):
+  """
+  This class is a customized callback function to iteratively delete all the
+  unnecassary nodes of the original input. It can be applied on any
+  *LinearPass* layer. The number of nodes :math:*n_{in}* is reduced
+  successively with respect to the optimum of the given metric.
+
+  The pruning or killing process is triggered whenever the threshold is
+  surpassed for a given interval (e.g. 90% accuracy for at least 15 epochs).
+
+  The pruning function itself is an exponential or linear approximation
+  towards the desired number of leftover nodes (n_features):
+
+  Exponential:
+
+  ..math::
+
+    n_{features}=n_{in}\dot(1-r_p)^{n_i}
+
+  Linear:
+
+  ..math::
+
+    n_{features}=n_{in}-n_p\cdot n_i
+
+  At each step there is a fixed percentage r_p or number n_p of nodes with
+  irrelevant data that is to be deleted.
+
+  Parameters
+  ----------
+  evaluation_data : tuple
+    A tuple with evaluation data and evaluation labels.
+  layer_name : str
+    Name of layer with class type 'LinearPass'. Specifies the layer where
+    irrelevant nodes are being deleted.
+  n_features : float, optional
+    Number of leftover optimized relevant nodes. If 'None', the node killing
+    lasts until threshold cannot be surpassed anymore. The default is None.
+  callback : dict
+    A dictionary with all the feature selection callback parameters. Use
+    get_callback_keys() method to get an overview on the valid keywords.
+    The default is None.
+
+  Returns
+  -------
+  None.
+
+  """
   def __init__(self, evaluation_data, layer_name, **kwargs):
-    """
-    This class is a customized callback function to iteratively delete all the
-    unnecassary input nodes (n_in) of a 'LinearPass' layer. The number of nodes
-    is reduced successively with respect to the optimum of the given metric.
-
-    The pruning or killing process is triggered whenever the threshold is
-    surpassed for a given interval (e.g. 90 % accuracy for at least 15 epochs).
-
-    The pruning function itself is an exponential or linear approximation
-    towards the desired number of leftover nodes (n_features):
-
-    Exponential:
-      n_features = n_in * (1-r_p)**n_i
-
-    Linear:
-      n_features = n_in - n_p*n_i
-
-    At each step there is a fixed percentage r_p or number n_p of nodes with
-    irrelevant data that is to be deleted.
-
-    Parameters
-    ----------
-    evaluation_data : tuple
-      A tuple with evaluation data and evaluation labels.
-    layer_name : str
-      Name of layer with class type 'LinearPass'. Specifies the layer where
-      irrelevant nodes are being deleted.
-    n_features : float, optional
-      Number of leftover optimized relevant nodes. If 'None', the node killing
-      lasts until threshold cannot be surpassed anymore. The default is None.
-    callback : dict
-      A dictionary with all the feature selection callback parameters. Use
-      get_callback_keys() method to get an overview on the valid keywords.
-      The default is None.
-
-    Returns
-    -------
-    None.
-
-    """
     super().__init__()
     self._get_params(**kwargs)
     self.evaluation_data = self.get_evaluation_subset(evaluation_data)
@@ -76,18 +88,18 @@ class FeatureSelection(Callback):
     The procedure is a s follows:
 
       1. Initialize:
-        Store variables in self.logs (log for all iterations of the callback)
-        and self.trigger (updates of each trigger variable after each epoch).
+      Store variables in self.logs (log for all iterations of the callback) and
+      self.trigger (updates of each trigger variable after each epoch).
 
       2. Update of trigger and stopping criteria:
-        Decision whether to pause training for an evaluation of feature
-        importance (step 3) AND decision whether to stop training and feature
-        selection or not.
+      Decision whether to pause training for an evaluation of feature
+      importance (step 3) AND decision whether to stop training and feature
+      selection or not.
 
       3. Update of weights:
-        If callback is not triggered, the algorithm will not update anything.
-        If it is triggered, it chooses the most uninformative features to be
-        pruned.
+      If callback is not triggered, the algorithm will not update anything.
+      If it is triggered, it chooses the most uninformative features to be
+      pruned.
 
     Parameters
     ----------
@@ -138,7 +150,7 @@ class FeatureSelection(Callback):
 
     """
     # parameter container with train, build and data parameters
-    self._params = callback.NN()
+    self._params = callback.CallbackParamsNN()
 
     for key in kwargs:
       containers = {'callback': self._params}
@@ -443,27 +455,34 @@ class FeatureSelection(Callback):
 
     return H
 
-  def merge_losses(self, H):
+  def get_H_m(self, H_c):
     """
-    Merges current and previous loss values according to the previous mask.
+    Merges current :math:`H_{c}` and previous :math:`H_{p}` cross-entropy loss
+    values according to the previous pruning mask.
+
+    Parameters
+    ----------
+    H_c : ndarray
+      Current cross-entropy values.
 
     Returns
     -------
-    None.
+    H_m : ndarray
+      Merged cross-entropy values.
 
     """
     if self.log.f_loss:
-      H_previous = np.array(self.log.f_loss[-1])
+      H_p = np.array(self.log.f_loss[-1])
 
-      H_merged = H_previous
-      H_merged[self.log.m_k[-1]] = H[self.log.m_k[-1]]
-      self.log.f_loss.append(H_merged)
+      H_m = H_p
+      H_m[self.log.m_k[-1]] = H_c[self.log.m_k[-1]]
+      self.log.f_loss.append(H_m)
 
     else:
-      H_merged = H
-      self.log.f_loss = [H_merged]
+      self.log.f_loss = [H_c]
+      H_m = H_c
 
-    return H_merged
+    return H_m
 
   #check function: stop model?
   def early_stopping_criterion(self, epoch, logs):
@@ -541,8 +560,6 @@ class FeatureSelection(Callback):
           f"Pruned {int(len(weights) - np.sum(weights))} feature(s). "
           f"Left with {int(self.log.f_n[-1])} feature(s).\n")
 
-
-
   def _get_indices(self, H_features, n_features):
     """
     Get the features with the most important information.
@@ -607,57 +624,142 @@ class FeatureSelection(Callback):
     loss = self._params._calculate_loss(P, Q)
     return loss
 
-  def _get_information_richness(self):
+  def get_feature_omission_impact(self, norm=None, metric='mean'):
     """
-    We use the cross-entropy H that measures uncertainty of possible outcomes
-    and is the best suited loss metric for multiclass classification tasks.
-    It has several calculation steps, where the entropy for the whole
-    evaluation with multiple replications H_s is divided into the corresponding
-    features H_f_s. Those feature entropies are then averaged by using the
-    metric in 'metric'.
+    The cross-entropy :math:`H` measures uncertainty of possible outcomes and
+    is the best suited loss metric for multiclass classification tasks. It is
+    applied on the LOOCV masked dataset and returns the 'feature omission
+    impact' (FOI). This method has several calculation steps.
+
+    Parameters
+    ----------
+    norm : str
+      The normalization method for the cross-entropies along the sample axis.
+      The default is 'None'.
+    metric : str
+      The metric for summarizing the cross-entropy losses. The default is
+      'mean'.
 
     Returns
     -------
-    H_f : ndarray
-      The summarized cross-entropy for each feature.
+    I_f : ndarray
+      The feature omission impact.
 
     """
 
     # get prediction data for the measure
-    H = self.map_evaluation_data()
+    H_c = self.map_evaluation_data()
 
-    H = self.merge_losses(H)
+    H_m = self.get_H_m(H_c)
 
     if self._params.remove_outliers:
-        H = self._remove_ouliers(H)
+        H_m = self.remove_ouliers(H_m)
 
-    if self._params.normalization == 'min-max':
-      H = normalize.min_max(H, axis=0)
+    NORM = {'min-max': normalize.min_max,
+            'standardize': normalize.standardize}
 
-    elif self._params.normalization == 'standardize':
-      H = normalize.standardize(H, axis=0)
+    if norm in NORM:
+      H = NORM[norm](H_m, axis=1)
+
+    else:
+      H = H_m
 
     # applies decsion metric of all entropies as loss
     METRIC = {'average': np.mean,
               'median': np.median}
 
-    H_f = METRIC[self._params.decision_metric](H, axis=1)
+    I_f = METRIC[metric](H, axis=1)
 
-    self.log.f_eval.append(H_f)
+    self.log.f_eval.append(I_f)
 
-    return H_f
+    return I_f
 
-  def _remove_ouliers(self, X, factor=1):
-    quant3, quant1 = np.percentile(X, [95, 5], axis=1)
-    iqr = quant3 - quant1
-    iqr_sigma = iqr/1.34896
-    med_data = np.median(X, axis=1)
-    for i in range(X.shape[0]):
-      X[i] = np.where(X[i] > med_data[i] - factor*iqr_sigma[i],
-                      X[i], med_data[i])
-      X[i] = np.where(X[i] < med_data[i] + factor*iqr_sigma[i],
-                      X[i], med_data[i])
-    return X
+  def remove_ouliers(self, X, method='std'):
+    """
+    Removing outliers according to the given method.
+
+    Parameters
+    ----------
+    X : ndarray
+      Complete data with outliers included.
+    method : str
+      The method used for the outlier removal. The default is 'std'.
+      Possible options are:
+        - std: standard deviation approach with :math:`3\sigma`.
+        - iqr: inter-quartile methods with a 75% percentile and a factor of
+          :math:`1.5`.
+
+    Returns
+    -------
+    X_ : ndarray
+      The data with outliers removed.
+
+    """
+    methods = {'std': self.remove_outliers_STD,
+               'iqr': self.remove_outliers_IQR}
+    X_ = methods[method](X)
+    return X_
+
+  def remove_outliers_STD(self, X, sigma=3.):
+    """
+    Removing outliers using the standard deviation method expecting a normal
+    distribution.
+
+    Parameters
+    ----------
+    X : ndarray
+      Complete data with outliers included.
+    sigma : float, optional
+      The scaling factor of sigma. The default is :math:`3.0`.
+
+    Returns
+    -------
+    X_ : ndarray
+      The data with outliers removed.
+
+    """
+    mean = np.mean(X, axis=1)
+    std = np.std(X, axis=1)
+
+    l_thresh = np.ones(X.shape) * np.array(mean - std*3, ndmin=2).T
+    u_thresh = np.ones(X.shape) * np.array(mean + std*3, ndmin=2).T
+
+    X_ = np.array(X)
+    X_[X<l_thresh] = l_thresh[X<l_thresh]
+    X_[X>u_thresh] = u_thresh[X>u_thresh]
+    return X_
+
+  def remove_outliers_IQR(self, X, percentile=75, factor=1.5):
+    """
+    Removing outliers according to the inter-quartile range method (IQR) as the
+    correct distribution cannot be known.
+
+    Parameters
+    ----------
+    X : ndarray
+      Complete data with outliers included.
+    percentile : float, optional
+      The percentile value in percent. The default is 75.
+    factor : float, optional
+      The factor for the scale of the inter-quartile value. The default is 1.
+
+    Returns
+    -------
+    X_ : ndarray
+      The data with outliers removed.
+
+    """
+    Q3, Q1 = np.percentile(X, [percentile, 100-percentile], axis=1)
+    Q1 = np.ones(X.shape) * np.array(Q1, ndmin=2).T
+    Q3 = np.ones(X.shape) * np.array(Q3, ndmin=2).T
+    Q2 = np.ones(X.shape) * np.array(np.median(X, axis=1), ndmin=2).T
+
+    IQR = Q3 - Q1
+
+    X_ = np.array(X)
+    X_[X>Q2+IQR*factor] = (Q2+IQR*factor)[X>Q2+IQR*factor]
+    X_[X<Q2-IQR*factor] = (Q2-IQR*factor)[X<Q2-IQR*factor]
+    return X_
 
   def _prune_weights(self, epoch):
     """
@@ -680,7 +782,8 @@ class FeatureSelection(Callback):
 
     """
     # calculate the amount of features after the pruning iteration
-    H_features = self._get_information_richness()
+    H_features = self.get_feature_omission_impact(self._params.normalization,
+                                                  self._params.decision_metric)
     n_features = self._get_n_features()
 
     # get indices that shall be kept
