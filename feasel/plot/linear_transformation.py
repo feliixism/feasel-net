@@ -113,6 +113,7 @@ class LinearTransformationVisualizer(Base):
 
     ax = fig.add_subplot(111)
     ax.set_ylabel("explained variance [$\%$]")
+    ax.set_xlabel(self.component_type)
 
     # gets oev and cev for the first n components:
     oev = self.data.oev[0, :self.container.params.build.n_components]
@@ -169,6 +170,8 @@ class LinearTransformationVisualizer(Base):
     ax.set_xticks(ticks)
     ax.set_xticklabels(ticklabels)
     ax.set_xlim(-0.5, len(oev)-0.5)
+    ax.set_axisbelow(True)
+    ax.grid(axis='y')
 
     ax.set_ylim(0, 105)
 
@@ -449,8 +452,11 @@ class LinearTransformationVisualizer(Base):
     ax.set_ylabel("feature importance")
     ax.set_xlabel("features")
     ax.set_ylim(np.amin(np.abs(height))*0.95, np.amax(np.abs(height))*1.05)
+    ax.set_axisbelow(True)
+    ax.grid(axis='y')
 
     ax.set_xlim(-0.5, x[-1] + 0.5)
+    ax.set_ylim(0, np.amax(height)*1.05)
 
   def plot_features_of_interest(self, FOI, x, y):
     """

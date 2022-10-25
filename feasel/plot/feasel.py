@@ -2,20 +2,15 @@
 feasel.plot.feasel
 ==================
 """
-
+# external packages
 import numpy as np
 
-# matplotlib imports
+import matplotlib.pyplot as plt
 from matplotlib import cm, colors
 from matplotlib.lines import Line2D
-import matplotlib.pyplot as plt
 
+# internal packages
 from .neural_network import NeuralNetworkVisualizer
-
-# PLOT PROPERTIES:
-# figure size:
-full_width = 7.14
-half_width = 3.5
 
 class FeaselVisualizer(NeuralNetworkVisualizer):
   def __init__(self, model_container):
@@ -67,17 +62,20 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
 
     Returns
     -------
-    None.
+      fig : matplotlib.pyplot.figure
+        The current figure.
 
     """
     if not self._pruned:
       return
 
-    fig = plt.figure('Pruning History', figsize=(half_width, 2))
+    fig = plt.figure('Pruning History')
     plt.clf()
 
     ax = fig.add_subplot(111)
     ax = self._pruning_history(ax)
+
+    return fig
 
   def _pruning_history(self, ax):
     """
@@ -96,7 +94,6 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
 
     """
     # plot content and informative variables
-
     n_prunes, n_features = self.log.m_k.shape
     F = self.log.f_n.astype(int)
 
@@ -125,10 +122,7 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
               bbox=dict(facecolor='w'))
 
       # last prune
-      if not self.container.callback.trigger._success:
-        last = int(E[-1])
-      else:
-        last = int(E[-2])
+      last = int(E[-2])
       ax.axvline(last, color = "k", ls = "-.")
       ax.text(last, y_max / 2,
               f"last prune: $e={last}$",
@@ -168,13 +162,14 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
 
     Returns
     -------
-    None.
+      fig : matplotlib.pyplot.figure
+        The current figure.
 
     """
     if not self._pruned:
       return
 
-    fig = plt.figure('Mask History', figsize=(half_width, 2))
+    fig = plt.figure('Mask History')
     plt.clf()
 
     gs = fig.add_gridspec(1, 2, width_ratios=[1, 20])
@@ -186,6 +181,8 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
     # colorbar:
     ax2 = fig.add_subplot(gs[0, 0])
     self._colorbar(fig, ax2)
+
+    return fig
 
   def _mask_history(self, ax, highlight):
     """
@@ -351,13 +348,14 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
 
     Returns
     -------
-    None.
+      fig : matplotlib.pyplot.figure
+        The current figure.
 
     """
     if not self._pruned:
       return
 
-    fig = plt.figure("Input Reduction", figsize=(half_width, 4))
+    fig = plt.figure("Input Reduction")
     plt.clf()
 
     if plot == "both":
@@ -387,6 +385,8 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
       raise NameError(f"'{plot}' is not a valid argument for 'plot'. "
                       "Try 'mask', 'prune' or 'both' instead.")
 
+    return fig
+
   def evaluation_history(self):
     """
     Plots the history of the evaluation metric used for the feature selection.
@@ -394,7 +394,8 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
 
     Returns
     -------
-    None.
+      fig : matplotlib.pyplot.figure
+        The current figure.
 
     """
     if not self._pruned:
@@ -410,7 +411,7 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
               self.default.c_cmap(16)] # used for the threshold
 
     if params.eval_metric in ['loss', 'val_loss']:
-      fig = plt.figure('Pruning History', figsize=(half_width, 4))
+      fig = plt.figure('Pruning History')
       plt.clf()
 
       # two subplots are needed since the evaluation is based on the gradient
@@ -431,7 +432,7 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
           ax.axvline(i, c='k', lw=0.5)
 
     else:
-      fig = plt.figure('Evaluation History', figsize=(half_width, 2))
+      fig = plt.figure('Evaluation History')
       plt.clf()
       # only one axis is needed for the history
       ax1 = fig.add_subplot(111)
@@ -447,7 +448,9 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
     ax1.set_xlim(x[0], x[-1])
     ax1.set_ylabel(f'{params.eval_metric}')
 
-  def feature_omission_impact(self, pruning_step=-2, show_loss=False):
+    return fig
+
+  def FOI(self, pruning_step=0, show_loss=False):
     """
     Generates a bar and box plot where the decision metrics for the feature
     pruning are shown.
@@ -455,84 +458,85 @@ class FeaselVisualizer(NeuralNetworkVisualizer):
     Parameters
     ----------
     pruning_step : int or list, optional
-      The pruning step(s) that shall be investigated. A list of integers is also
-      allowed. If None, it will show all feature pruning steps. The default is
-      -2, which implicates displaying the last pruning step.
-
-    show_samples : bool, optional
+      The pruning step(s) that shall be investigated. A list of integers is
+      also allowed. If None, it will show all feature pruning steps. The
+      default is 0, which implies displaying the last pruning step.
+    show_loss : bool, optional
       If True, it will show a box plot for all evaluated samples during the
       pruning procedure. The default is False.
 
     Returns
     -------
-    None.
+      fig : matplotlib.pyplot.figure
+        The current figure.
 
     """
     if not self._pruned:
       return
-
-    norm = self.params.normalization
-    features = self.data.features
-
-    label = r'$\mathcal{I}_f$'
 
     pruning_steps = np.array(pruning_step, ndmin=1)
 
     for i in pruning_steps:
       # the masks for each pruning step (applied on second subplot):
       try:
-        mask_k = self.log.m_k[i+1]
-        mask_p = self.log.m_p[i+1]
+        # data
+        features = self.data.features
+        mask_k = self.log.m_k[1:-1][i-1]
+        mask_p = self.log.m_p[1:-1][i-1]
+        f_loss = self.log.f_loss[i-1]
+        f_eval = self.log.f_eval[i-1]
 
       except:
-        msg = f'Step {i+1} is out of range 1-{len(self.log.m_k)+1} steps.'
-        raise ValueError(msg)
+        n_p_max = len(self.log.m_k)
+        raise ValueError(f'Step {i-1} is out of range 1-{n_p_max} steps.')
 
       colors = [self.default.c_cmap(0), self.default.c_cmap(6)]
 
-      if show_loss:
-        figsize = (half_width, 4)
-
-      else:
-        figsize = (half_width, 2)
-
-      fig = plt.figure(f'Feature evaluation losses at {i+1}. Prune '
-                       f'(Epoch: {self.log.e_prune[i+1]})', figsize=figsize)
+      fig = plt.figure(f'Feature evaluation losses at {i}. Prune')
       plt.clf()
 
-      # first subplot: box plot for the entropy all samples with each masked
-      # feature
+      # first subplot: box plot for the entropy of all samples and features
       if show_loss:
         ax1 = fig.add_subplot(211)
-        ax1.set_title('features')
-        ax1.boxplot(self.log.f_loss[i].T,
-                    labels=np.arange(self.container.n_in),
+        ax1.boxplot(f_loss.T, labels=np.arange(self.container.n_in),
                     flierprops=dict(marker='+', markersize=4))
-        ax1.set_xlim(0.5, self.container.n_in+0.5)
-        ax1.tick_params(labelbottom=False)
+
+        # y-axis
         ax1.set_ylabel(r'loss $\mathcal{L}_{f,s}$')
 
-        # second subplot: bar plot with feature selection metric and masks
+        # x-axis
+        ax1.set_xlim(0.5, self.container.n_in+0.5)
+        ax1.tick_params(labelbottom=False)
+
         ax2 = fig.add_subplot(212, sharex=ax1)
 
       else:
         ax2 = fig.add_subplot(111)
-        ax2.set_title('features')
 
+      # second subplot: bar plot with feature selection metric and masks
       ax2.bar(np.argwhere(mask_k).squeeze()+1,
-              self.log.f_eval[i][mask_k],
+              f_eval[mask_k],
               color=colors[0], label='keep')
       ax2.bar(np.argwhere(mask_p).squeeze()+1,
-              self.log.f_eval[i][mask_p],
+              f_eval[mask_p],
               color=colors[1], label='prune')
-      ax2.set_xlim(0.5, self.container.n_in+0.5)
+
+      ax2.set_xlim(0.5, self.container.n_in + 0.5)
 
       # enables 10 ticks in x-axis with strings
       ratio = int(len(features) / 10)
 
       ax2.set_xticks(np.arange(len(features))[::ratio]+1)
-      ax2.set_xticklabels(features[::ratio],
-                          rotation=-45, ha='left')
+      ax2.set_xticklabels(features[::ratio], rotation=-45, ha='left')
 
-      ax2.set_ylabel(f'FOI {label}')
+      ax2.set_axisbelow(True)
+      ax2.grid(True, axis='y')
+
+      # labels:
+      label = r'$\mathcal{I}_f$'
+      ax2.set_ylabel(f'featuresOI {label}')
+      ax2.set_xlabel('feature $f$')
+
       ax2.legend(loc='upper right')
+
+    return fig

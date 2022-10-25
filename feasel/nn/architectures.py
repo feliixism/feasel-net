@@ -985,7 +985,7 @@ class FSDNN(FCDNN):
     Input array for training (and validation) targets.
   layer_name : *str*
     Layer name where the feature selection is applied.
-  n_features : int, optional
+  n_features : *int*, optional
     Number of features that shall be remaining. If None, a compression ratio
     of 10 % is used. The default is None.
   **kwargs : kwargs

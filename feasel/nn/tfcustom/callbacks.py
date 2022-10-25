@@ -512,14 +512,21 @@ class FeatureSelection(Callback):
             f"{int(self.log.f_n[-1])} features as input.")
 
     elif self.trigger._epoch_max:
-      self.log.update(epoch, self.log.f_eval[-1])
+      try:
+        self.log.update(epoch, self.log.f_eval[-1])
+        print(f"Epoch {epoch} - Non Convergent:\n"
+              "The optimizer did not converge. Please adjust the feature "
+              "selection and/or model parameters and try again.\n\nStopped "
+              f"training with '{self._params.eval_type}' of "
+              f"{logs[self._params.eval_type]} using "
+              f"{int(self.log.f_n[-1])} features as input.")
+      except:
+        print(f"Epoch {epoch} - Non Convergent:\n"
+              "The optimizer did not converge. Please adjust the feature "
+              "selection and/or model parameters and try again.\n\nStopped "
+              f"training without pruning any features.")
       self.model.stop_training = True
-      print(f"Epoch {epoch} - Non Convergent:\n"
-            "The optimizer did not converge. Please adjust the feature "
-            "selection and/or model parameters and try again.\n\nStopped "
-            f"training with '{self._params.eval_type}' of "
-            f"{logs[self._params.eval_type]} using "
-            f"{int(self.log.f_n[-1])} features as input.")
+
 
   #update functions: weights and stopping criteria
   def _update_weights(self, epoch, logs):

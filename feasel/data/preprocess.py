@@ -95,7 +95,7 @@ def one_hot(array):
   l_indices = get_indices(array, type='one-hot') # provides a list of indices
 
   # chek if one-hot already:
-  if (array.ndim != 2) and (np.unique(array) != [0,1]):
+  if (array.ndim != 2) and (np.any(np.unique(array) != np.array([0,1]))):
     # creates the empty one-hot encoded array:
     one_hot = np.zeros([len(array), len(l_indices)])
     for i, indices in enumerate(l_indices):

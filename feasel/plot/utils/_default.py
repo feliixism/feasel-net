@@ -72,11 +72,9 @@ class DefaultPlot:
 
     params['axes.prop_cycle'] = self.get_cycler(cmap='tab20c', n=20, groups=5)
 
-    params['grid.linestyle'] = '--'
-    params['grid.color'] = [0.5, 0.5, 0.5]
+    params['grid.linestyle'] = '-.'
+    params['grid.color'] = [0.9, 0.9, 0.9]
     params['grid.linewidth'] = 0.5
-    params['axes.grid.which'] = 'major'
-    params['axes.grid'] = True
 
     params['figure.dpi'] = 100
 

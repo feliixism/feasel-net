@@ -204,6 +204,8 @@ class CallbackTrigger(CallbackLog):
 
     if self._success and self._epoch_max:
       stop = True
+    elif self._epoch_max:
+      stop = True
     else:
       stop = False
 
