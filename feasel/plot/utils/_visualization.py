@@ -1,10 +1,10 @@
-import matplotlib as mpl
+"""
+feasel.plot.utils._visualization
+================================
+"""
+
 import matplotlib.pyplot as plt
-import mplcursors
-
-def click_connect(ax, features):
-    mplcursors.cursor(ax).connect("add", lambda sel: sel.annotation.set_text(features[sel.target.index]))
-
+import matplotlib as mpl
 from scipy.linalg import eigh
 import numpy as np
 
@@ -66,3 +66,5 @@ def confidence(ax, covariance_matrix, mu = [0, 0], s = 3, color = "k"):
         contour_gauss(ax, sigma_x = 2 * np.sqrt(evals[0]) * s, 
                       sigma_y = 2 * np.sqrt(evals[1]) * s, mu_x = mu[0], 
                       mu_y = mu[1], angle = 90 - angle, color = color)
+    
+        

@@ -1,3 +1,8 @@
+"""
+feasel.parameter.data
+=====================
+"""
+
 from .base import BaseParams
 
 _NORM_TYPES = {'min_max': ['min_max', 'min-max',
@@ -5,7 +10,7 @@ _NORM_TYPES = {'min_max': ['min_max', 'min-max',
                'standardize': ['standardize', 'standard',
                                'z score', 'z-score']}
 
-class Linear(BaseParams):
+class DataParamsLinear(BaseParams):
   """
   Parameter class for all data parameters.
 
@@ -20,11 +25,6 @@ class Linear(BaseParams):
     Defines whether or not the data is mean-centered. The default is 'False'.
   test_split : float,
     The ratio for the test data. The default is '0.2'.
-
-  Methods
-  -------
-  set_normalization(normalization)
-
 
   """
   def __init__(self,
@@ -90,7 +90,7 @@ class Linear(BaseParams):
         return NORM
     raise NameError(f"'{normalization}' is not a valid normalization.")
 
-class NN(BaseParams):
+class DataParamsNN(BaseParams):
   def __init__(self,
                normalization=None,
                sample_axis=None,

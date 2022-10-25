@@ -1,3 +1,8 @@
+"""
+feasel.nn.tfcustom.utils.callback.trigger
+=========================================
+"""
+
 from .log import CallbackLog
 
 class CallbackTrigger(CallbackLog):
@@ -198,6 +203,8 @@ class CallbackTrigger(CallbackLog):
       self._epoch_max = True
 
     if self._success and self._epoch_max:
+      stop = True
+    elif self._epoch_max:
       stop = True
     else:
       stop = False

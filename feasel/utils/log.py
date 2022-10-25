@@ -1,3 +1,8 @@
+"""
+feasel.utils.log
+================
+"""
+
 import os
 import datetime
 import tensorflow as tf

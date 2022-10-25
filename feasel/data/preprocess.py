@@ -1,4 +1,7 @@
 """
+feasel.data.preprocess
+======================
+
 This is a preprocessing module with several functions for data reshaping and
 target encodings.
 """
@@ -92,7 +95,7 @@ def one_hot(array):
   l_indices = get_indices(array, type='one-hot') # provides a list of indices
 
   # chek if one-hot already:
-  if (array.ndim != 2) and (np.unique(array) != [0,1]):
+  if (array.ndim != 2) and (np.any(np.unique(array) != np.array([0,1]))):
     # creates the empty one-hot encoded array:
     one_hot = np.zeros([len(array), len(l_indices)])
     for i, indices in enumerate(l_indices):
@@ -236,3 +239,59 @@ def resample(arr, num, axis=0):
     """
     resampled = scipy_resample(arr, num, axis = axis)
     return resampled
+
+def remove_outliers(X, y=None, sigma=2., axis=0):
+  """
+  Removes outliers from a data array.
+
+  Parameters
+  ----------
+  X : ndarray
+    The data array.
+  sigma : float, optional
+    The deviation defining the confidence interval. The default is :math:`2`.
+  axis : int, optional
+    The axis along the average and standarddeviation is calculated. The default
+    is :math:`0`.
+
+  Returns
+  -------
+  X_r(, y_r) : ndarray
+    The new array without the outliers (with label array in a tuple).
+
+  """
+  X_r = None
+  if not isinstance(y, type(None)):
+    classes = np.unique(y)
+    y_r = None
+  else:
+    classes = [None]
+
+  for c in classes:
+    if c is None:
+      mask = np.ones(len(X))
+    else:
+      mask = y == c
+
+    X_c = X[mask]
+
+    std = np.std(X_c, axis=axis)
+    mu = np.average(X_c, axis=axis)
+
+    maskd = np.all(-std * sigma <= X_c - mu, axis=1)
+    masku = np.all(X_c - mu <= std * sigma, axis=1)
+
+    mask_c = maskd * masku
+    try:
+      X_r = np.append(X_r, X_c[mask_c], axis=0)
+      if not isinstance(y, type(None)):
+        y_r = np.append(y_r, y[mask][mask_c], axis=0)
+    except:
+      X_r = X_c[mask_c]
+      if not isinstance(y, type(None)):
+        y_r = y[mask][mask_c]
+
+  if not isinstance(y, type(None)):
+    return X_r, y_r
+  else:
+    return X_r

@@ -1,46 +1,43 @@
+"""
+feasel.nn.architectures
+=======================
+"""
+
 import numpy as np
 from tensorflow import keras
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Dense, Dropout
 from ..data import classification
-from ..plots import FeaselVisualizer as Visualizer
-from ..parameters import ParamsNN
+from ..plot import FeaselVisualizer as Visualizer
+from ..parameter import ParamsNN
 from .tfcustom.callbacks import FeatureSelection
 from .tfcustom.layers import LinearPass
 from ..utils.time import get_timestamp
 
 import os
 
-class ModelContainer:
+class Base:
   """
   A model container, that stores all the information needed for a baseline
   generic neural network builder.
 
   Attributes
   ----------
-  X : ndarray
-    The input data.
-  y : ndarray, optional
+  X : ndarray (*float* or *int*)
+    The input data for training and validation purposes.
+  y : ndarray (*str*, *float* or *int*)
     The target data. During the training process, it will either be one-hot or
     sparsely encoded, depending on what has been specified in the builder.
-  history : None
+  history : *None*
     Placeholder for history information during training.
-  name : str
+  name : *str*
     The name of the model container.
-  params : Params class
-    A parameter container that has all information on *build*, *callback*,
-    *data*, and *train* processes.
-
-  Methods
-  -------
-  show_params(type=None)
-    Overview of all possible parameters for the instantiation of the 'Base'
-    class.
+  timestamp : *str*
+    The timestamp as additional information, when the current model has been
+    initialized.
 
   """
-  def __init__(self,
-               X, y=None, features=None,
-               name=None, **kwargs):
+  def __init__(self, X, y=None, features=None, name=None, **kwargs):
     self.X = X
     self.y = y
     self.history = None
@@ -65,33 +62,44 @@ class ModelContainer:
     return 'ModelContainer for Neural Networks'
 
   def __repr__(self):
-    return ("ModelContainer generic model object"
+    return ("Base generic model object"
             f"(Size of Dataset: {self._data.X.shape}, "
             f"Number of Samples: {self._data.n_samples}, "
             f"Number of Classes: {self._data.n_classes})")
 
   @property
+  def params(self):
+    """
+    A parameter container :obj:*feasel.parameters.Params* that has all
+    information on *build*, *callback*, *data*, and *train* processes.
+    """
+    return self._params
+
+  @property
   def data(self):
+    """
+    `feasel.data.classification.NN`
+      The data container used for the generic neural networks.
+    """
     return self._data
 
   @property
   def plot(self):
+    """
+    `feasel.plot.FeaselVisualizer`
+      The plot container used for plotting the feature selection results.
+    """
     return self._plot
 
   def set_name(self, name):
     """
-    Sets the name of the container.
+    Sets the name of the model container.
 
     Parameters
     ----------
     name : str
-      Name of the container. If None, it will use the class' name. The default
-      is None.
-
-    Returns
-    -------
-    None.
-
+      Name of the container. If `None`, it will use the class' name. The
+      default is `None`.
     """
     if not name:
       self.name = str(self)
@@ -119,13 +127,14 @@ class ModelContainer:
 
     """
     # parameter container with train, build and data parameters
-    self.params = Params()
+    self._params = ParamsNN()
+
+    containers = {'build': self.params.build,
+                  'data': self.params.data,
+                  'train': self.params.train,
+                  'callback': self.params.callback}
 
     for key in kwargs:
-      containers = {'build': self.params.build,
-                    'data': self.params.data,
-                    'train': self.params.train}
-
       # updates all values that are summarized in an extra container:
       if key in containers:
         for sub_key in kwargs[key]:
@@ -133,18 +142,10 @@ class ModelContainer:
             containers[key].update(sub_key)(kwargs[key][sub_key])
 
       # updates keys if they are not defined in an extra container:
-      elif key in self.params.build.__dict__.keys():
-        self.params.build.update(key)(kwargs[key])
-
-      elif key in self.params.data.__dict__.keys():
-        self.params.data.update(key)(kwargs[key])
-
-      elif key in self.params.train.__dict__.keys():
-        self.params.train.update(key)(kwargs[key])
-
-      else:
-        raise KeyError(f"'{key}' is not a valid key for the generic "
-                       "neural network useage.")
+      for C in containers:
+        params = containers[C]
+        if key in params.__dict__.keys():
+          params.update(key)(kwargs[key])
 
   def show_params(self, type=None):
     """
@@ -625,7 +626,7 @@ class ModelContainer:
 
     model_json = self.model.to_json()
 
-    with open(path + filename + ".json", "w") as jsoile:
+    with open(path + filename + ".json", "w") as json_file:
       json_file.write(model_json)
 
     # serialize weights to HDF5
@@ -637,7 +638,7 @@ class ModelContainer:
     self.architecture_type = model_path.split("/")[2]
     self.model = keras.models.load_model(model_path)
 
-class FCDNN(ModelContainer):
+class FCDNN(Base):
   def __init__(self, X, y, **kwargs):
     """
     Builds an DNN with only dense layers. Subclass of 'SpectralNeuralNet'.
@@ -686,9 +687,9 @@ class FCDNN(ModelContainer):
     self.set_n_layers(self._building_params["n_layers"])
     self.get_architecture()
 
-    self._params = {"data": self.params.data,
-                    "training": self.params.train,
-                    "building": self.params.build}
+    # self._params = {"data": self.params.data,
+    #                 "training": self.params.train,
+    #                 "building": self.params.build}
 
   def __str__(self):
     return 'DenseDNN'
@@ -972,33 +973,28 @@ class FCDNN(ModelContainer):
     return history
 
 class FSDNN(FCDNN):
+  """
+  The feature selection class object for Dense type deep neural networks
+  (DNNs).
+
+  Parameters
+  ----------
+  X : ndarray (*float* or *int*)
+    Input array for training (and validation) data.
+  y : ndarray (*str*, *float* or *int*)
+    Input array for training (and validation) targets.
+  layer_name : *str*
+    Layer name where the feature selection is applied.
+  n_features : *int*, optional
+    Number of features that shall be remaining. If None, a compression ratio
+    of 10 % is used. The default is None.
+  **kwargs : kwargs
+    All other accepted parameters. They can be inspected by using the method
+    :func:*feasel.nn.architectures.Base.show_params()*.
+
+  """
   def __init__(self, X, y, layer_name, n_features=None, **kwargs):
-    """
-    The feature selection class object for Dense type deep neural networks
-    (DNNs).
-
-    Parameters
-    ----------
-    X : ndarray
-      Input array for training (and validation) data.
-    y : ndarray
-      Input array for training (and validation) targets.
-    layer_name : str
-      Layer name where the feature selection is applied.
-    n_features : int, optional
-      Number of features that shall be remaining. If None, a compression ratio
-      of 10 % is used. The default is None.
-    **kwargs : kwargs
-      All other accepted parameters. They can be inspected by using the method
-      show_params().
-
-    Returns
-    -------
-    None.
-
-    """
     super().__init__(X, y, **kwargs)
-
     self.layer_name = layer_name
     self.params.callback.set_n_features(n_features)
     self.n_features = self.get_n_features()
@@ -1035,7 +1031,7 @@ class FSDNN(FCDNN):
 
     """
     # parameter container with train, build and data parameters
-    self.params = ParamsNN()
+    self._params = ParamsNN()
 
     for key in kwargs:
       containers = {'build': self.params.build,
@@ -1124,7 +1120,7 @@ class FSDNN(FCDNN):
     if not self.callback:
       self.callback = self.get_callback(layer_name=self.layer_name,
                                         n_features=self.n_features,
-                                        **self.params.callback.dictionary)
+                                        **self.params.callback.settings)
     if not isinstance(self.data.X_test, type(None)):
       validation_data = (self.data.X_test, self.data.y_test)
     else:

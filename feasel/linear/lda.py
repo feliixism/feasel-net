@@ -1,10 +1,15 @@
+"""
+feasel.linear.lda
+=================
+"""
+
 import numpy as np
 
 from .base import ModelContainer
 from .pca import PCA
 from .svd import SVD
 from ..data import classification
-from ..plots import LinearTransformationVisualizer as Visualizer
+from ..plot import LinearTransformationVisualizer as Visualizer
 from ..utils.time import get_timestamp
 
 class LDA(ModelContainer):
@@ -45,8 +50,8 @@ class LDA(ModelContainer):
 
     #data container
     self._data = classification.Linear(X, y, features,
-      sample_axis=self.params.data.sample_axis,
-      normalization=self.params.data.normalization)
+                                       sample_axis=self.params.data.sample_axis,
+                                       normalization=self.params.data.normalization)
 
     # embed plot class
     self._plot = Visualizer(self)
@@ -85,11 +90,13 @@ class LDA(ModelContainer):
     TYPE = {'scatter': self.data.scatter_matrix }
     try:
       self.data.mean_centered(self.data.X_train) # sets 'data.mu'
-      self.data.scatter_w = np.zeros([self.data.n_features, self.data.n_features])
-      self.data.scatter_b = np.zeros([self.data.n_features, self.data.n_features])
+      self.data.scatter_w = np.zeros([self.data.n_features,
+                                      self.data.n_features])
+      self.data.scatter_b = np.zeros([self.data.n_features,
+                                      self.data.n_features])
 
       for c in self.data.classes: # handbook of statistics (Cheriet 2013)
-        idx = np.argwhere(self.data.y_train == c).flatten()
+        idx = self.data.y_train == c
         data = self.data.X_train[idx]
         # add data to each class:
         self.data.class_props['n'].append(len(data))
@@ -111,7 +118,7 @@ class LDA(ModelContainer):
         self.data.scatter_b += n * d_mu.T @ d_mu
       self.data.common_covariance = (self.data.scatter_b
                                      / (self.data.n_samples
-                                        - self.data.n_classes))
+                                        -self.data.n_classes))
 
       sw_sb = np.linalg.inv(self.data.scatter_w) @ self.data.scatter_b
 
@@ -179,27 +186,24 @@ class LDA(ModelContainer):
                    solver=self.params.build.solver)
     self.pca.get_eigs()
 
-  def decision_rule(self, scores, components=None, transformed=False):
+  def decision_rule(self, score, components=None):
 
-    if not isinstance(components, type(None)):
-      loadings = self.data.loadings[components]
-      scores = scores[:, components]
-
-    else:
-      loadings = self.data.loadings[:self.params.build.n_components]
-      scores = scores[:, :self.params.build.n_components]
+    loadings = self.data.loadings[:self.params.build.n_components]
 
     common_covariance = loadings @ self.data.common_covariance @ loadings.T
     common_covariance_ = np.linalg.inv(common_covariance)
 
+    if not isinstance(components, type(None)):
+      common_covariance_ = common_covariance_[components][:,components]
+
     # actual decision rule
-    delta = np.zeros([len(scores), self.data.n_classes])
+    delta = np.zeros([len(score), self.data.n_classes])
 
     for i, c in enumerate(self.data.classes):
-      mu = loadings @ self.data.class_props["mu"][i].T
+      mu = (loadings @ self.data.class_props["mu"][i].T)[components]
       delta[:, i] = (np.log10(self.data.class_props["prior"][i])
                      - 1/2 * mu.T @ common_covariance_ @ mu
-                     + scores @ common_covariance_ @ mu).flatten()
+                     + score @ common_covariance_ @ mu).flatten()
 
     return delta
 

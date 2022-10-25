@@ -1,3 +1,8 @@
+"""
+feasel.linear.svd
+=================
+"""
+
 import numpy as np
 from scipy.linalg import svd
  

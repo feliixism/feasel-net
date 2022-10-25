@@ -1,3 +1,9 @@
+"""
+***********************************
+Plot Container (:mod:`feasel.plot`)
+***********************************
+"""
+
 from . import base
 from . import feasel
 from . import neural_network

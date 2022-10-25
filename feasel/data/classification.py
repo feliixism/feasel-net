@@ -1,34 +1,43 @@
+"""
+feasel.data.classification
+==========================
+"""
+
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-from ..parameters import data
+from ..parameter import data
 from . import preprocess as prep
 
 class Linear:
   """
-  This is a data object for the regression with the principal component
-  analysis (PCA). Within this class all necessary pre-processing and
-  data-handling tasks can be undertaken.
+  This is a data object for the regression or classification with principal
+  component analysis (PCA) or Linear Discriminant Analysis (LDA) respectively.
+  Within this class all necessary pre-processing and data-handling tasks can be
+  executed.
 
   Parameters
   ----------
-  X : ndarray
-    Input array for the fitting of the analysis.
-  y : ndarray, optional
-    Target array for the loss estimation if provided. The default is None.
-  features : ndarray, optional
-    Defines the feature's names and must have the same size as the feature
-    shape. If None, the features are iterated from 0 to the number of
-    features-1. The default is None.
+  X : ndarray [int or float]
+    Input array for the fitting of the analyses.
+  y : ndarray [int, float or str], optional
+      Target array for the loss estimation if provided. This data is only
+      necessary when dealing with LDAs, but can also be used for PCAs (e.g.
+      for plot functionalities). The default is None.
+  features : ndarray [int, float or str], optional
+    Defines the feature's names. It must have the same size as the feature
+    shape. If None, the features are iterated from :math:`0` to the number of
+    features :math:`n_f-1`. The default is `None`.
   **kwargs : dict
-    All keywords that are allowed in the DataParams class. Those are:
+    All keywords that are allowed in the DataParams class.
 
-    sample_axis : int, optional
-      Defines the sample axis. If None, the algorithm tries to find the
-      sample axis on its own. The default is None.
-    normalization : str, optional
-      Defines the normalization type. Possible arguments are 'standardize'
-      and 'min_max'. The default is None.
+    These are:
+      sample_axis : int, optional
+        Defines the sample axis. If None, the algorithm tries to find the
+        sample axis on its own. The default is None.
+      normalization : str, optional
+        Defines the normalization type. Possible arguments are 'standardize'
+        and 'min_max'. The default is None.
 
   Raises
   ------
@@ -74,8 +83,9 @@ class Linear:
     self.oev = None
     self.cev = None
     self.contribution = None
+    self.importance = None
 
-    self.params = data.Linear(**kwargs)
+    self.params = data.DataParamsLinear(**kwargs)
 
     for key in kwargs:
       if key in self.params.__dict__.keys():
@@ -261,7 +271,7 @@ class Linear:
     else:
       try:
         #normalize and transform shape to correct input layer shape
-        if method != 'None':
+        if not isinstance(method, type(None)):
           NORM = {'standardize': self._standardize,
                   'min_max': self._min_max}
           X_n = NORM[method](X)
@@ -493,6 +503,11 @@ class NN:
         data. The possible types are given by the official Keras layer names.
         The default is None.
 
+  Attributes
+  ----------
+  n_classes : int
+    The number of classes.
+
   Raises
   ------
   ValueError
@@ -530,7 +545,7 @@ class NN:
     self._feature_scale = None
 
     #params container
-    self.params = data.NN()
+    self.params = data.DataParamsNN()
 
     for key in kwargs:
       if key in self.params.__dict__.keys():

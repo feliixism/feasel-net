@@ -1,3 +1,8 @@
+"""
+feasel.utils.syntax
+===================
+"""
+
 def update_kwargs(object, class_name = None, **kwargs):
     add_kwargs(object)
     check_kwargs(object, class_name = class_name, **kwargs)

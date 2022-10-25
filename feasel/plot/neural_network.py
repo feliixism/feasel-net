@@ -1,3 +1,8 @@
+"""
+feasel.plot.neural_networks
+===========================
+"""
+
 import numpy as np
 from pathlib import Path
 from sklearn.metrics import confusion_matrix
@@ -11,9 +16,6 @@ from .base import Base
 from ..data import metrics
 
 # PLOT PROPERTIES:
-# figure size:
-full_width = 7.14
-half_width = 3.5
 
 class NeuralNetworkVisualizer(Base):
   def __init__(self, model_container):
@@ -147,7 +149,8 @@ class NeuralNetworkVisualizer(Base):
 
     Returns
     -------
-    None.
+      fig : matplotlib.pyplot.figure
+        The current figure.
 
     """
     self._trained
@@ -155,19 +158,19 @@ class NeuralNetworkVisualizer(Base):
     metric = [metric]
 
     if not metric[0]:
-      fig = plt.figure('Training History', figsize=(half_width, 4))
+      fig = plt.figure('Training History')
       fig.clf()
       ax1 = fig.add_subplot(211)
       ax2 = fig.add_subplot(212, sharex=ax1)
       metric = ['accuracy', 'loss']
 
     elif metric[0] == 'accuracy':
-      fig = plt.figure('Training History', figsize=(half_width, 2))
+      fig = plt.figure('Training History')
       fig.clf()
       ax1 = fig.add_subplot(111)
 
     elif metric[0] == 'loss':
-      fig = plt.figure('Training History', figsize=(half_width, 2))
+      fig = plt.figure('Training History')
       fig.clf()
       ax2 = fig.add_subplot(111)
 
@@ -208,6 +211,8 @@ class NeuralNetworkVisualizer(Base):
       ax1.set_xlabel(None)
       ax1.tick_params(labelbottom=False)
 
+    return fig
+
   def model(self, directory=None, modelname=None):
     """
     Saves an image of the visualization of the model's summary using a function
@@ -232,7 +237,7 @@ class NeuralNetworkVisualizer(Base):
     plot_model(self.model,
                filename,
                show_shapes=True,
-               dpi=100)
+               dpi=250)
 
   def feature_maps(self, X, layername):
     """
@@ -245,6 +250,11 @@ class NeuralNetworkVisualizer(Base):
     layer_name : str
       Defines name of the layer from which the feature map is extracted.
 
+    Returns
+    -------
+      fig : matplotlib.pyplot.figure
+        The current figure.
+
     """
     self._trained
 
@@ -255,7 +265,6 @@ class NeuralNetworkVisualizer(Base):
     rows, cols = self._get_subplot_array(n_feature_maps)
 
     fig, axs = plt.subplots(rows, cols, sharex=True, sharey=True,
-                            figsize=(half_width*cols, 2*rows),
                             num=f'Feature Maps at {layername}')
 
     axs = np.array(axs, ndmin=2)
@@ -275,7 +284,7 @@ class NeuralNetworkVisualizer(Base):
         if idx == n_feature_maps:
           break
 
-    return feature_maps
+    return fig
 
   # analyzers
   def predict(self, X, y=None, model=None):
@@ -296,13 +305,13 @@ class NeuralNetworkVisualizer(Base):
 
     Returns
     -------
-    None.
-
+      fig : matplotlib.pyplot.figure
+        The current figure.
     """
     self._trained
     y_pred, y_true = self.container.test(X, y, model=model)
 
-    fig = plt.figure('Prediction of a sample', figsize=(half_width, 2))
+    fig = plt.figure('Prediction of a sample')
     fig.clf()
     ax = fig.add_subplot(111)
     classes = np.arange(self.container.data.n_classes)
@@ -330,9 +339,32 @@ class NeuralNetworkVisualizer(Base):
     # legend:
     ax.legend(loc='upper right')
 
+    return fig
+
   def predict_set(self, X, y,
-                 metric='accuracy',
-                 model=None):
+                  metric='accuracy',
+                  model=None):
+    """
+    Predicts a set of data and plots the prediction performance of the current
+    classifier.
+
+    Parameters
+    ----------
+    X : ndarray
+      The input data.
+    y : ndarray
+      The target data.
+    metric : str, optional
+      The metric that is evaluated. The default is 'accuracy'.
+    model : keras.Model, optional
+      A keras model that replaces the model instantiated in the container
+      class. If None, it will use the container model. The default is None.
+
+    Returns
+    -------
+      fig : matplotlib.pyplot.figure
+        The current figure.
+    """
     self._trained
     y_pred, y_true = self.container.test(X, y, model=model)
 
@@ -347,13 +379,13 @@ class NeuralNetworkVisualizer(Base):
     y_true = self.container.data.one_hot_labels(y_true)
 
     if isinstance(metric, list):
-      fig = plt.figure('Test prediction', figsize=(half_width, 2))
+      fig = plt.figure('Test prediction')
       fig.clf()
       ax = fig.add_subplot(111)
       self._multiple_metrics(ax, y_true, y_pred, metric)
 
     else:
-      fig = plt.figure(f'Test {metric}', figsize=(half_width, 2))
+      fig = plt.figure(f'Test {metric}')
       fig.clf()
       ax = fig.add_subplot(111)
 
@@ -535,9 +567,8 @@ class NeuralNetworkVisualizer(Base):
 
     Returns
     -------
-    cm : ndarray
-      The confusion matrix.
-
+      fig : matplotlib.pyplot.figure
+        The current figure.
     """
     self._trained
 
@@ -590,7 +621,7 @@ class NeuralNetworkVisualizer(Base):
 
     ax.grid(False)
 
-    return cm
+    return fig
 
   def ROC(self, X, y, fit=False):
     """
@@ -612,16 +643,15 @@ class NeuralNetworkVisualizer(Base):
 
     Returns
     -------
-    None.
-
+      fig : matplotlib.pyplot.figure
+        The current figure.
     """
 
     # get true and predicted targets:
     y_pred, y_true = self.container.test(X, y)
     TPR, FPR = metrics.ROC(y_pred, y_true)
 
-    fig = plt.figure(num='Receiver operating characteristic curve',
-                     figsize=(half_width, 2))
+    fig = plt.figure(num='Receiver operating characteristic curve')
     fig.clf()
     ax = fig.add_subplot(111)
 
@@ -674,6 +704,9 @@ class NeuralNetworkVisualizer(Base):
 
     ax.set_aspect(1)
 
+
+    return fig
+
   def weights(self, type='weights', layernames=None):
     """
     Plots weights values.
@@ -686,6 +719,11 @@ class NeuralNetworkVisualizer(Base):
     layernames : str (or: list of str)
         Defines name of layer(s). If None, it will plot all layers. The default
         is None.
+
+    Returns
+    -------
+      fig : matplotlib.pyplot.figure
+        The current figure.
     """
     self._trained
 
@@ -754,3 +792,5 @@ class NeuralNetworkVisualizer(Base):
           else:
             raise ValueError(f"Dimensionality of layer '{name}' {i_map[i]} to "
                              "high.")
+
+    return fig

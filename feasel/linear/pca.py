@@ -1,11 +1,16 @@
+"""
+feasel.linear.pca
+=================
+"""
+
 import numpy as np
 from scipy.linalg import eigh
 
 from .base import ModelContainer
 from .svd import SVD
 from ..data import regression
-from ..parameters import ParamsLinear
-from ..plots import LinearTransformationVisualizer as Visualizer
+from ..parameter import ParamsLinear
+from ..plot import LinearTransformationVisualizer as Visualizer
 from ..utils.time import get_timestamp
 
 class PCA(ModelContainer):

@@ -1,8 +1,13 @@
+"""
+feasel.parameter.train
+======================
+"""
+
 from tensorflow import keras
 
 from .base import BaseParams
 
-class NN(BaseParams):
+class TrainParamsNN(BaseParams):
   def __init__(self,
                batch_size=32,
                epochs=100,
