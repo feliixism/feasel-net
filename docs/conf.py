@@ -52,7 +52,7 @@ exclude_patterns = ['_build',
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'pydata_sphinx_theme'
+html_theme = 'classic'
 html_theme_options = {
 	"github_url": "https://github.tik.uni-stuttgart.de/FelixFischer/FeaSel-Net",
 	}
