@@ -10,12 +10,12 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.10"
-    tensorflow: "2.9.1"
-    scikit-learn: "1.1.2"
-    scipy: "1.9"
-    matplotlib: "3.5.2"
-    mplcursors: "0.5.1"
-    numpy: "1.23"
+    # tensorflow: "2.9.1"
+    # scikit-learn: "1.1.2"
+    # scipy: "1.9"
+    # matplotlib: "3.5.2"
+    # mplcursors: "0.5.1"
+    # numpy: "1.23"
     
 
 # Build documentation in the "docs/" directory with Sphinx
